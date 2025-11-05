@@ -1,0 +1,21 @@
+---
+alwaysApply: true
+---
+# SmartSeikyu Core Requirements
+
+## Purpose
+Invoice generation process optimization
+
+## Background
+Currently processing customer usage data exported as CSV from Metrics site for billing data processing, but there's risk of human errors, so we want to automate this process
+
+## Cursor Development Rules
+- The main programming language to be used is TypeScript.
+- The framework to be used is React.
+- The application must be built to ensure proper operation and compatibility with Google Chrome.
+- Unused code should be removed as much as possible.
+- Components and methods that seem to be reusable should be designed with reusability (commonization) in mind from the beginning.
+- Comments should be written to prioritize code readability.
+- We aim to optimize the build process for speed and lightweight performance.
+- When selecting libraries, priority should be given to those that are the most widely used in web development and available for free.
+- For team development, the versions of npm and Node.js must be fixed to ensure consistency across environments.
