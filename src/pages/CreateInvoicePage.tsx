@@ -55,14 +55,17 @@ export const CreateInvoicePage = () => {
   // ファイル選択ハンドラー
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && file.name.endsWith('.csv')) {
-      setUploadedFile(file);
-    } else {
-      alert('.csvファイルのみアップロード可能です。');
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+    if (file) {
+      if (file.name.endsWith('.csv')) {
+        setUploadedFile(file);
+      } else {
+        alert('.csvファイルのみアップロード可能です。');
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
     }
+    // ファイルが選択されていない場合（キャンセル）は何もしない
   };
 
   // ドラッグ&ドロップハンドラー
@@ -81,11 +84,14 @@ export const CreateInvoicePage = () => {
     setIsDragOver(false);
 
     const file = event.dataTransfer.files[0];
-    if (file && file.name.endsWith('.csv')) {
-      setUploadedFile(file);
-    } else {
-      alert('.csvファイルのみアップロード可能です。');
+    if (file) {
+      if (file.name.endsWith('.csv')) {
+        setUploadedFile(file);
+      } else {
+        alert('.csvファイルのみアップロード可能です。');
+      }
     }
+    // ファイルがドロップされていない場合は何もしない
   };
 
   // 登録ボタンのハンドラー
