@@ -5,11 +5,12 @@
 interface CardItemProps {
   iconSrc: string;
   title: string;
+  onClick?: () => void;
 }
 
-export const CardItem = ({ iconSrc, title }: CardItemProps) => {
+export const CardItem = ({ iconSrc, title, onClick }: CardItemProps) => {
   return (
-    <div className="card-item">
+    <div className="card-item" onClick={onClick}>
       <div className="card-icon">
         <img className="card-icon-raw" src={iconSrc} alt={title} />
       </div>
