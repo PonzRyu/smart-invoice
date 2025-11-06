@@ -8,8 +8,8 @@
     "npm": "10.8.2"
   },
   "scripts": {
-    "dev": "vite",
     "build": "tsc && vite build",
+    "start": "vite",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
@@ -34,6 +34,7 @@
     "eslint-plugin-react-refresh": "^0.4.7",
     "prettier": "^3.3.2",
     "typescript": "^5.5.3",
-    "vite": "^5.3.1"
+    "vite": "^5.3.1",
+    "vite-plugin-pwa": "^1.1.0"
   }
 }
