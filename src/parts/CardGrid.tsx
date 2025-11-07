@@ -25,7 +25,7 @@ export const CardGrid = () => {
     {
       icon: customerManagementIcon,
       title: '顧客管理',
-      path: '',
+      path: '/Customers',
     },
   ];
 
