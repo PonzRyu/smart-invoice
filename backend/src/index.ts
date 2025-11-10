@@ -4,6 +4,7 @@ import cors from 'cors';
 import { config } from 'dotenv';
 import { AppDataSource } from './database/data-source';
 import { CustomerInfo } from './database/entities/CustomerInfo';
+import { IssuedInvoice } from './database/entities/IssuedInvoice';
 
 config();
 
@@ -168,6 +169,39 @@ app.delete('/api/customers/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting customer:', error);
     res.status(500).json({ error: 'Failed to delete customer' });
+  }
+});
+
+// 請求書発行情報取得
+app.get('/api/issued-invoices', async (req, res) => {
+  try {
+    const { companyCode } = req.query;
+
+    if (typeof companyCode !== 'string' || companyCode.trim() === '') {
+      return res.status(400).json({ error: 'companyCode is required' });
+    }
+
+    const issuedInvoiceRepository = AppDataSource.getRepository(IssuedInvoice);
+    const invoices = await issuedInvoiceRepository.find({
+      where: { company_code: companyCode },
+      order: {
+        issued_date: 'DESC',
+        invoice_code: 'DESC',
+      },
+    });
+
+    const normalizedInvoices = invoices.map((invoice) => ({
+      ...invoice,
+      ttm:
+        invoice.ttm !== null && invoice.ttm !== undefined
+          ? Number(invoice.ttm)
+          : null,
+    }));
+
+    res.json(normalizedInvoices);
+  } catch (error) {
+    console.error('Error fetching issued invoices:', error);
+    res.status(500).json({ error: 'Failed to fetch issued invoices' });
   }
 });
 

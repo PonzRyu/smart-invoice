@@ -200,11 +200,11 @@ export const CustomerManagementPage = () => {
       // 新規顧客追加時のバリデーション
       if (isAdding) {
         if (!newCustomer.company_name || !newCustomer.company_code) {
-          alert('顧客名と顧客コードは必須です。');
+          alert('顧客名と顧客コードは必須項目です。');
           return;
         }
         if (!newCustomer.currency) {
-          alert('通貨は必須です。');
+          alert('通貨単位は必須項目です。');
           return;
         }
         if (isNaN(newCustomer.unit_price) || newCustomer.unit_price < 0) {
@@ -410,7 +410,9 @@ export const CustomerManagementPage = () => {
                 <div className="customer-list-header">
                   <div className="customer-list-cell cell-name">顧客名</div>
                   <div className="customer-list-cell cell-code">顧客コード</div>
-                  <div className="customer-list-cell cell-currency">通貨</div>
+                  <div className="customer-list-cell cell-currency">
+                    通貨単位
+                  </div>
                   <div className="customer-list-cell cell-price">単価</div>
                   <div className="customer-list-cell cell-date">更新日</div>
                   <div className="customer-list-cell cell-actions"></div>
