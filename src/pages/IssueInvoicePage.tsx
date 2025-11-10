@@ -37,6 +37,9 @@ export const IssueInvoicePage = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [excessBillingMap, setExcessBillingMap] = useState<
+    Record<number, boolean>
+  >({});
 
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -159,6 +162,24 @@ export const IssueInvoicePage = () => {
     }
   }, [currentPage, totalPages]);
 
+  useEffect(() => {
+    setExcessBillingMap((prev) => {
+      const updated: Record<number, boolean> = {};
+      issuedInvoices.forEach((invoice) => {
+        updated[invoice.id] = prev[invoice.id] ?? false;
+      });
+      return updated;
+    });
+  }, [issuedInvoices]);
+
+  const handleToggleExcessBilling = (invoiceId: number) => {
+    setExcessBillingMap((prev) => {
+      const nextValue = !(prev[invoiceId] ?? false);
+      const nextMap = { ...prev, [invoiceId]: nextValue };
+      return nextMap;
+    });
+  };
+
   const startIndex =
     issuedInvoices.length === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1;
   const endIndex =
@@ -274,6 +295,10 @@ export const IssueInvoicePage = () => {
             issuedInvoices.length > 0 &&
             !isLoadingInvoices && (
               <>
+                <div className="issue-invoice-excess-description">
+                  <span className="issue-invoice-required-marker">*</span>
+                  商品更新数110%超過分を請求します。
+                </div>
                 <div className="customer-list issue-invoice-list">
                   <div className="customer-list-header issue-invoice-header">
                     <div className="customer-list-cell issue-invoice-cell">
@@ -287,6 +312,15 @@ export const IssueInvoicePage = () => {
                     </div>
                     <div className="customer-list-cell issue-invoice-cell">
                       公表仲値(TTM)
+                    </div>
+                    <div
+                      className="customer-list-cell issue-invoice-cell issue-invoice-cell-toggle"
+                      title="商品更新数110%超過分を請求します。"
+                    >
+                      超過利用分の請求
+                      <span className="issue-invoice-required-marker issue-invoice-required-marker--inline">
+                        *
+                      </span>
                     </div>
                     <div className="customer-list-cell issue-invoice-cell">
                       ダウンロード
@@ -308,6 +342,21 @@ export const IssueInvoicePage = () => {
                       </div>
                       <div className="customer-list-cell issue-invoice-cell">
                         {invoice.ttm !== null ? invoice.ttm.toFixed(2) : '-'}
+                      </div>
+                      <div
+                        className="customer-list-cell issue-invoice-cell issue-invoice-cell-toggle"
+                        title="商品更新数110%超過分を請求します。"
+                      >
+                        <label className="toggle-switch toggle-switch-small">
+                          <input
+                            type="checkbox"
+                            checked={excessBillingMap[invoice.id] ?? false}
+                            onChange={() =>
+                              handleToggleExcessBilling(invoice.id)
+                            }
+                          />
+                          <span className="toggle-slider"></span>
+                        </label>
                       </div>
                       <div className="customer-list-cell issue-invoice-cell">
                         <button
