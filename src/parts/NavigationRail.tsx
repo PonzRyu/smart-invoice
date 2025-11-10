@@ -21,7 +21,7 @@ export const NavigationRail = () => {
     {
       icon: issueInvoiceIcon,
       title: '請求書発行',
-      path: '',
+      path: '/IssueInvoice',
     },
     {
       icon: customerManagementIcon,

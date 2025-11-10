@@ -20,7 +20,7 @@ export const CardGrid = () => {
     {
       icon: issueInvoiceIcon,
       title: '請求書発行',
-      path: '',
+      path: '/IssueInvoice',
     },
     {
       icon: customerManagementIcon,
