@@ -1,10 +1,21 @@
-import { useState, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { TopBar } from '../parts/TopBar';
 import { NavigationRail } from '../parts/NavigationRail';
 import { BottomBar } from '../parts/BottomBar';
 import fileCsvIcon from '../styles/raws/file_csv_raw.svg';
 import linkIcon from '../styles/raws/link_raw.svg';
+import questionIcon from '../styles/raws/question_raw.svg';
 import '../styles/styles.css';
+
+/**
+ * 顧客情報の型
+ */
+interface Customer {
+  id: number;
+  company_name: string;
+  company_code: string;
+  currency: string;
+}
 
 /**
  * 請求書作成ページコンポーネント
@@ -13,18 +24,82 @@ import '../styles/styles.css';
 export const CreateInvoicePage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 顧客情報
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+  const [customerFetchError, setCustomerFetchError] = useState<string | null>(
+    null
+  );
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+
   // フォームの状態管理
-  const [customerName, setCustomerName] = useState('');
   const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
   const [tts, setTts] = useState('');
   const [ttb, setTtb] = useState('');
-  const [excessBilling, setExcessBilling] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 選択中の顧客情報
+  const selectedCustomer = useMemo(() => {
+    if (!selectedCustomerId) return undefined;
+    const parsedId = Number(selectedCustomerId);
+    return customers.find((customer) => customer.id === parsedId);
+  }, [customers, selectedCustomerId]);
+
+  const selectedCustomerDisplayName = useMemo(() => {
+    if (!selectedCustomer) return '';
+    return `${selectedCustomer.company_name}(${selectedCustomer.company_code})`;
+  }, [selectedCustomer]);
+
+  const isExchangeRateDisabled =
+    selectedCustomer !== undefined && selectedCustomer.currency !== '$';
+  const isExchangeRateRequired =
+    selectedCustomer !== undefined && selectedCustomer.currency === '$';
+
+  // 顧客情報の取得
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      setIsLoadingCustomers(true);
+      setCustomerFetchError(null);
+      try {
+        const response = await fetch('http://localhost:3001/api/customers');
+        if (!response.ok) {
+          throw new Error('顧客情報の取得に失敗しました。');
+        }
+        const data: Customer[] = await response.json();
+        setCustomers(data);
+      } catch (error) {
+        console.error('Error fetching customers:', error);
+        setCustomerFetchError(
+          error instanceof Error
+            ? error.message
+            : '顧客情報の取得中に予期せぬエラーが発生しました。'
+        );
+      } finally {
+        setIsLoadingCustomers(false);
+      }
+    };
+
+    fetchCustomers();
+  }, []);
+
+  // 為替入力不可の場合は値をリセット
+  useEffect(() => {
+    if (isExchangeRateDisabled) {
+      setTts('');
+      setTtb('');
+    }
+  }, [isExchangeRateDisabled]);
 
   // 公表仲値(TTM)の計算
   const calculateTtm = (): string => {
+    if (isExchangeRateDisabled) {
+      return '';
+    }
+
     const ttsValue = parseFloat(tts);
     const ttbValue = parseFloat(ttb);
     if (!isNaN(ttsValue) && !isNaN(ttbValue)) {
@@ -36,20 +111,36 @@ export const CreateInvoicePage = () => {
 
   // 必須項目がすべて入力されているかチェック
   const isFormValid =
-    customerName !== '' && year !== '' && month !== '' && uploadedFile !== null;
+    selectedCustomerId !== '' &&
+    year !== '' &&
+    month !== '' &&
+    uploadedFile !== null &&
+    (isExchangeRateDisabled
+      ? true
+      : tts.trim() !== '' &&
+        ttb.trim() !== '' &&
+        !isNaN(parseFloat(tts)) &&
+        !isNaN(parseFloat(ttb)));
 
-  // キャンセルボタンのハンドラー
-  const handleCancel = () => {
-    setCustomerName('');
+  // フォームのリセット
+  const resetForm = () => {
+    setSelectedCustomerId('');
     setYear('');
     setMonth('');
     setTts('');
     setTtb('');
-    setExcessBilling(false);
+    setTtb('');
     setUploadedFile(null);
+    setIsConfirmModalOpen(false);
+    setIsSubmitting(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  // キャンセルボタンのハンドラー
+  const handleCancel = () => {
+    resetForm();
   };
 
   // ファイル選択ハンドラー
@@ -96,44 +187,91 @@ export const CreateInvoicePage = () => {
 
   // 登録ボタンのハンドラー
   const handleSubmit = () => {
-    if (isFormValid) {
-      // ここで実際の登録処理を実装
+    if (!isFormValid) {
+      return;
+    }
+    setIsConfirmModalOpen(true);
+  };
+
+  // 確認モーダル: キャンセル
+  const handleModalCancel = () => {
+    setIsConfirmModalOpen(false);
+  };
+
+  // 確認モーダル: 続行
+  const handleModalConfirm = async () => {
+    if (!uploadedFile || !selectedCustomer) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      // TODO: 次ステップの仕様に基づき実際の登録処理を実装する
       console.log('登録データ:', {
-        customerName,
+        customer: {
+          id: selectedCustomer.id,
+          name: selectedCustomerDisplayName,
+          currency: selectedCustomer.currency,
+        },
         year,
         month,
-        tts,
-        ttb,
-        ttm: calculateTtm(),
-        excessBilling,
-        uploadedFile: uploadedFile?.name,
+        exchangeRate:
+          selectedCustomer.currency === '$'
+            ? { tts, ttb, ttm: calculateTtm() }
+            : null,
+        uploadedFileName: uploadedFile.name,
       });
       alert('登録が完了しました。');
-      // ページ遷移またはデータクリア
-      handleCancel();
+      resetForm();
+    } catch (error) {
+      console.error('Error submitting invoice data:', error);
+      alert('登録処理に失敗しました。時間をおいて再度お試しください。');
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  const handleCustomerChange = (value: string) => {
+    setSelectedCustomerId(value);
   };
 
   return (
     <div className="page">
       <div className="content">
         <div className="create-invoice-form">
+          {isLoadingCustomers && (
+            <div className="form-status-message info">
+              顧客情報を読み込んでいます...
+            </div>
+          )}
+          {customerFetchError && (
+            <div className="form-status-message error">
+              {customerFetchError}
+            </div>
+          )}
+
           {/* 利用顧客名 */}
           <div className="form-group">
             <label className="form-label required">利用顧客名</label>
             <select
-              className={`form-select ${customerName === '' ? 'placeholder' : ''}`}
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
+              className={`form-select ${selectedCustomerId === '' ? 'placeholder' : ''}`}
+              value={selectedCustomerId}
+              onChange={(e) => handleCustomerChange(e.target.value)}
               required
+              disabled={isLoadingCustomers || !!customerFetchError}
             >
               <option value="" disabled>
-                株式会社○○○○(○○○)
+                利用顧客を選択してください
               </option>
-              <option value="株式会社ニトリ(○○○)">株式会社ニトリ(○○○)</option>
-              <option value="株式会社テスト(○○○)">株式会社テスト(○○○)</option>
-              <option value="テスト株式会社(○○○)">テスト株式会社(○○○)</option>
+              {customers.map((customer) => (
+                <option key={customer.id} value={customer.id.toString()}>
+                  {customer.company_name}({customer.company_code})
+                </option>
+              ))}
             </select>
+            {selectedCustomer && (
+              <div className="form-hint">通貨：{selectedCustomer.currency}</div>
+            )}
           </div>
 
           {/* 利用年月 */}
@@ -178,7 +316,13 @@ export const CreateInvoicePage = () => {
           {/* 為替レート */}
           <div className="form-group">
             <div className="form-label-with-link">
-              <label className="form-label">為替レート</label>
+              <label
+                className={`form-label ${
+                  isExchangeRateRequired ? 'required' : ''
+                }`}
+              >
+                為替レート
+              </label>
               <a
                 href="https://www.murc-kawasesouba.jp/fx/past_3month.php"
                 target="_blank"
@@ -199,6 +343,8 @@ export const CreateInvoicePage = () => {
                   onChange={(e) => setTts(e.target.value)}
                   step="0.01"
                   placeholder="0.00"
+                  required={isExchangeRateRequired}
+                  disabled={isExchangeRateDisabled}
                 />
               </div>
               <div className="exchange-rate-item">
@@ -210,6 +356,8 @@ export const CreateInvoicePage = () => {
                   onChange={(e) => setTtb(e.target.value)}
                   step="0.01"
                   placeholder="0.00"
+                  required={isExchangeRateRequired}
+                  disabled={isExchangeRateDisabled}
                 />
               </div>
               <div className="exchange-rate-item">
@@ -223,22 +371,11 @@ export const CreateInvoicePage = () => {
                 />
               </div>
             </div>
-          </div>
-
-          {/* 超過金額の請求 */}
-          <div className="form-group">
-            <label className="form-label">超過金額の請求</label>
-            <div className="toggle-container">
-              <span className="toggle-label">商品更新数110%超過分の請求</span>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={excessBilling}
-                  onChange={(e) => setExcessBilling(e.target.checked)}
-                />
-                <span className="toggle-slider"></span>
-              </label>
-            </div>
+            {isExchangeRateDisabled && selectedCustomer && (
+              <div className="exchange-rate-disabled-hint">
+                選択した利用顧客の通貨単位が「$」ではないため、為替レートは入力できません。
+              </div>
+            )}
           </div>
 
           {/* 元データをアップロード */}
@@ -286,6 +423,11 @@ export const CreateInvoicePage = () => {
             </div>
           </div>
 
+          <div className="form-required-note">
+            <span className="required-asterisk">*</span>{' '}
+            が付いている項目は必須項目です。
+          </div>
+
           {/* ボタン */}
           <div className="form-actions">
             <button
@@ -305,6 +447,73 @@ export const CreateInvoicePage = () => {
             </button>
           </div>
         </div>
+
+        {isConfirmModalOpen && (
+          <div
+            className="confirm-modal-overlay"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="confirm-modal">
+              <div className="confirm-modal__icon">
+                <img src={questionIcon} alt="確認" />
+              </div>
+              <div className="confirm-modal__body">
+                <p className="confirm-modal__message">
+                  以下の内容で登録します。よろしいですか？
+                  <br />
+                  重複データは上書きされます。
+                </p>
+                <ul className="confirm-modal__summary">
+                  <li className="confirm-modal__summary-item">
+                    <span className="summary-label">利用顧客名</span>
+                    <span className="summary-value">
+                      {selectedCustomerDisplayName || '未選択'}
+                    </span>
+                  </li>
+                  <li className="confirm-modal__summary-item">
+                    <span className="summary-label">利用年月</span>
+                    <span className="summary-value">
+                      {year && month ? `${year}年${month}月` : '-'}
+                    </span>
+                  </li>
+                  {selectedCustomer?.currency === '$' && (
+                    <li className="confirm-modal__summary-item">
+                      <span className="summary-label">為替レート(TTM)</span>
+                      <span className="summary-value summary-value--single">
+                        {calculateTtm() || '-'}
+                      </span>
+                    </li>
+                  )}
+                  <li className="confirm-modal__summary-item">
+                    <span className="summary-label">元データ</span>
+                    <span className="summary-value summary-value--file">
+                      {uploadedFile?.name || '未選択'}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+              <div className="confirm-modal__actions">
+                <button
+                  type="button"
+                  className="btn btn-cancel"
+                  onClick={handleModalCancel}
+                  disabled={isSubmitting}
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-submit"
+                  onClick={handleModalConfirm}
+                  disabled={isSubmitting}
+                >
+                  続行
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       <TopBar headline="請求書作成" />
       <NavigationRail />
