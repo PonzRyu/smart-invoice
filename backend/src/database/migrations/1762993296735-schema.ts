@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class Schema1762415984523 implements MigrationInterface {
-    name = 'Schema1762415984523'
+export class Schema1762993296735 implements MigrationInterface {
+    name = 'Schema1762993296735'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`
@@ -37,9 +37,9 @@ export class Schema1762415984523 implements MigrationInterface {
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "id" SERIAL NOT NULL,
-                "company_code" integer NOT NULL,
-                "store_code" integer NOT NULL,
-                "store_name" text NOT NULL,
+                "company_code" text NOT NULL,
+                "store_code" text NOT NULL,
+                "store_name" text,
                 "date" date NOT NULL,
                 "total_labels" integer NOT NULL,
                 "product_updated" integer NOT NULL,
@@ -47,12 +47,15 @@ export class Schema1762415984523 implements MigrationInterface {
             )
         `);
         await queryRunner.query(`
+            CREATE UNIQUE INDEX "IDX_42491f2fe12f39f230421ab2c6" ON "store_summary" ("company_code", "store_code", "date")
+        `);
+        await queryRunner.query(`
             ALTER TABLE "issued_invoice"
             ADD CONSTRAINT "FK_8138945eeb9c7f0ef455a56a6d8" FOREIGN KEY ("company_code") REFERENCES "customer_info"("company_code") ON DELETE NO ACTION ON UPDATE NO ACTION
         `);
         await queryRunner.query(`
             ALTER TABLE "store_summary"
-            ADD CONSTRAINT "FK_8556b5aead77ec1ed184d597fd9" FOREIGN KEY ("company_code") REFERENCES "customer_info"("id") ON DELETE NO ACTION ON UPDATE NO ACTION
+            ADD CONSTRAINT "FK_8556b5aead77ec1ed184d597fd9" FOREIGN KEY ("company_code") REFERENCES "customer_info"("company_code") ON DELETE NO ACTION ON UPDATE NO ACTION
         `);
     }
 
@@ -62,6 +65,9 @@ export class Schema1762415984523 implements MigrationInterface {
         `);
         await queryRunner.query(`
             ALTER TABLE "issued_invoice" DROP CONSTRAINT "FK_8138945eeb9c7f0ef455a56a6d8"
+        `);
+        await queryRunner.query(`
+            DROP INDEX "public"."IDX_42491f2fe12f39f230421ab2c6"
         `);
         await queryRunner.query(`
             DROP TABLE "store_summary"
