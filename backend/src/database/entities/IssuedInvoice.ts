@@ -41,7 +41,7 @@ export class IssuedInvoice {
     scale: 2,
     nullable: true,
   })
-  ttm: number;
+  ttm: number | null;
 
   @ManyToOne(
     () => CustomerInfo,

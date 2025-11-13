@@ -1,11 +1,216 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Papa from 'papaparse/papaparse.js';
 import { TopBar } from '../parts/TopBar';
 import { NavigationRail } from '../parts/NavigationRail';
 import { BottomBar } from '../parts/BottomBar';
 import fileCsvIcon from '../styles/raws/file_csv_raw.svg';
 import linkIcon from '../styles/raws/link_raw.svg';
 import questionIcon from '../styles/raws/question_raw.svg';
+import warningIcon from '../styles/raws/warning_raw.svg';
 import '../styles/styles.css';
+
+type ModalMode = 'confirm' | 'processing' | 'error' | 'success';
+
+type ParsedCsvRow = Record<string, string | undefined>;
+
+interface PreparedStoreSummary {
+  day: string;
+  company: string;
+  store: string;
+  name?: string;
+  totalLabels: number;
+  productUpdated: number;
+}
+
+interface ParseCsvResult {
+  rows: ParsedCsvRow[];
+  headers: string[];
+}
+
+interface UploadResult {
+  invoiceCode: number;
+  issuedDate: string;
+}
+
+const REQUIRED_HEADERS = [
+  'Day',
+  'Company',
+  'Store',
+  'Total Labels',
+  'Product Updated',
+];
+
+const sanitizeNumber = (value: string): number => {
+  const normalized = value.replace(/,/g, '').trim();
+  if (normalized === '') {
+    return Number.NaN;
+  }
+  return Number(normalized);
+};
+
+const parseCsvFile = (
+  file: File,
+  onProgress: (percent: number) => void
+): Promise<ParseCsvResult> =>
+  new Promise((resolve, reject) => {
+    const rows: ParsedCsvRow[] = [];
+    let headers: string[] = [];
+    Papa.parse<ParsedCsvRow>(file, {
+      header: true,
+      skipEmptyLines: true,
+      encoding: 'utf-8',
+      chunkSize: 1024 * 1024,
+      chunk: (results: Papa.ParseResult<ParsedCsvRow>) => {
+        if (headers.length === 0 && Array.isArray(results.meta.fields)) {
+          headers = results.meta.fields;
+        }
+        rows.push(...results.data);
+        const cursor = results.meta.cursor;
+        if (typeof cursor === 'number' && file.size > 0) {
+          const percent = Math.min(70, Math.round((cursor / file.size) * 70));
+          onProgress(percent);
+        }
+      },
+      complete: () => {
+        onProgress(75);
+        resolve({
+          rows,
+          headers,
+        });
+      },
+      error: (error: Error) => {
+        reject(error);
+      },
+    });
+  });
+
+const validateAndTransformCsv = (
+  headers: string[],
+  rows: ParsedCsvRow[],
+  selectedCompanyCode: string,
+  issuedMonth: string
+): { records: PreparedStoreSummary[] } | { errorMessages: string[] } => {
+  const normalizedHeaders = headers.map((header) => header.trim());
+  const missingHeaders = REQUIRED_HEADERS.filter(
+    (header) => !normalizedHeaders.includes(header)
+  );
+
+  if (missingHeaders.length > 0) {
+    return {
+      errorMessages: [
+        '元データが不正です。元データの中身をご確認ください。',
+        `${missingHeaders.join(', ')}データが存在しません。`,
+      ],
+    };
+  }
+
+  const records: PreparedStoreSummary[] = [];
+  const companies = new Set<string>();
+
+  for (const row of rows) {
+    const dayRaw = (row['Day'] ?? '').trim();
+    const companyRaw = (row['Company'] ?? '').trim();
+    const storeRaw = (row['Store'] ?? '').trim();
+    const nameRaw = (row['Name'] ?? '').trim();
+    const totalLabelsRaw = (row['Total Labels'] ?? '').trim();
+    const productUpdatedRaw = (row['Product Updated'] ?? '').trim();
+
+    // 空行はスキップ
+    if (
+      dayRaw === '' &&
+      companyRaw === '' &&
+      storeRaw === '' &&
+      totalLabelsRaw === '' &&
+      productUpdatedRaw === ''
+    ) {
+      continue;
+    }
+
+    if (dayRaw === '' || companyRaw === '' || storeRaw === '') {
+      return {
+        errorMessages: [
+          '元データが不正です。元データの中身をご確認ください。',
+          'Day, Company, Storeのいずれかが欠損している行があります。',
+        ],
+      };
+    }
+
+    const normalizedDay = dayRaw.replace(/\//g, '-');
+    if (normalizedDay.length < 10) {
+      return {
+        errorMessages: [
+          '元データが不正です。元データの中身をご確認ください。',
+          'Dayの形式が不正な行があります。',
+        ],
+      };
+    }
+
+    const dayMonth = normalizedDay.slice(0, 7);
+    if (dayMonth !== issuedMonth) {
+      return {
+        errorMessages: [
+          '利用年月が正しくありません。',
+          '元データの中身を確認して正しい利用年月を指定してください。',
+        ],
+      };
+    }
+
+    const totalLabels = sanitizeNumber(totalLabelsRaw);
+    const productUpdated = sanitizeNumber(productUpdatedRaw);
+
+    if (Number.isNaN(totalLabels) || Number.isNaN(productUpdated)) {
+      return {
+        errorMessages: [
+          '元データが不正です。元データの中身をご確認ください。',
+          'Total LabelsまたはProduct Updatedに数値以外の値が含まれています。',
+        ],
+      };
+    }
+
+    const nameValue = nameRaw === '' ? undefined : nameRaw;
+
+    records.push({
+      day: normalizedDay,
+      company: companyRaw,
+      store: storeRaw,
+      name: nameValue,
+      totalLabels,
+      productUpdated,
+    });
+    companies.add(companyRaw);
+  }
+
+  if (records.length === 0) {
+    return {
+      errorMessages: ['元データに有効なレコードが存在しません。'],
+    };
+  }
+
+  if (companies.size !== 1) {
+    return {
+      errorMessages: [
+        '元データが不正です。元データの中身をご確認ください。',
+        '元データに複数の顧客(Company)が含まれています。元データは必ず1つの顧客を指定して出力してください。',
+      ],
+    };
+  }
+
+  const [csvCompany] = Array.from(companies);
+
+  if (csvCompany !== selectedCompanyCode) {
+    return {
+      errorMessages: [
+        '利用顧客名と元データの顧客名が一致しないです。',
+        '元データの中身をご確認ください。',
+        `利用顧客名：${selectedCompanyCode}`,
+        `元データー：${csvCompany}`,
+      ],
+    };
+  }
+
+  return { records };
+};
 
 /**
  * 顧客情報の型
@@ -22,6 +227,7 @@ interface Customer {
  * 請求書作成に必要な情報を入力するフォーム
  */
 export const CreateInvoicePage = () => {
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 顧客情報
@@ -41,6 +247,11 @@ export const CreateInvoicePage = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalMode, setModalMode] = useState<ModalMode>('confirm');
+  const [modalMessages, setModalMessages] = useState<string[]>([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadProgressLabel, setUploadProgressLabel] = useState('');
+  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
 
   // 選択中の顧客情報
   const selectedCustomer = useMemo(() => {
@@ -123,19 +334,27 @@ export const CreateInvoicePage = () => {
         !isNaN(parseFloat(ttb)));
 
   // フォームのリセット
+  const closeModal = () => {
+    setIsConfirmModalOpen(false);
+    setModalMode('confirm');
+    setModalMessages([]);
+    setUploadProgress(0);
+    setUploadProgressLabel('');
+    setUploadResult(null);
+    setIsSubmitting(false);
+  };
+
   const resetForm = () => {
     setSelectedCustomerId('');
     setYear('');
     setMonth('');
     setTts('');
     setTtb('');
-    setTtb('');
     setUploadedFile(null);
-    setIsConfirmModalOpen(false);
-    setIsSubmitting(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+    closeModal();
   };
 
   // キャンセルボタンのハンドラー
@@ -190,12 +409,32 @@ export const CreateInvoicePage = () => {
     if (!isFormValid) {
       return;
     }
+    setModalMode('confirm');
+    setModalMessages([]);
+    setUploadProgress(0);
+    setUploadProgressLabel('');
+    setUploadResult(null);
+    setIsSubmitting(false);
     setIsConfirmModalOpen(true);
   };
 
   // 確認モーダル: キャンセル
   const handleModalCancel = () => {
-    setIsConfirmModalOpen(false);
+    if (modalMode === 'processing') {
+      return;
+    }
+    closeModal();
+  };
+
+  const handleSuccessNavigate = () => {
+    if (!selectedCustomer) {
+      closeModal();
+      return;
+    }
+
+    const targetCompanyCode = selectedCustomer.company_code;
+    resetForm();
+    navigate('/IssueInvoice', { state: { companyCode: targetCompanyCode } });
   };
 
   // 確認モーダル: 続行
@@ -204,28 +443,105 @@ export const CreateInvoicePage = () => {
       return;
     }
 
+    const issuedMonth = `${year}-${month.padStart(2, '0')}`;
+
     try {
+      setModalMode('processing');
       setIsSubmitting(true);
-      // TODO: 次ステップの仕様に基づき実際の登録処理を実装する
-      console.log('登録データ:', {
-        customer: {
-          id: selectedCustomer.id,
-          name: selectedCustomerDisplayName,
-          currency: selectedCustomer.currency,
-        },
-        year,
-        month,
-        exchangeRate:
-          selectedCustomer.currency === '$'
-            ? { tts, ttb, ttm: calculateTtm() }
-            : null,
-        uploadedFileName: uploadedFile.name,
+      setModalMessages([]);
+      setUploadProgress(5);
+      setUploadProgressLabel('CSVを解析しています...');
+
+      const parseResult = await parseCsvFile(uploadedFile, (percent) => {
+        setUploadProgress(percent);
+        setUploadProgressLabel('CSVを解析しています...');
       });
-      alert('登録が完了しました。');
-      resetForm();
+
+      const validationResult = validateAndTransformCsv(
+        parseResult.headers,
+        parseResult.rows,
+        selectedCustomer.company_code,
+        issuedMonth
+      );
+
+      if ('errorMessages' in validationResult) {
+        setModalMode('error');
+        setModalMessages(validationResult.errorMessages);
+        setUploadProgress(0);
+        setUploadProgressLabel('');
+        return;
+      }
+
+      setUploadProgress((prev) => Math.max(prev, 80));
+      setUploadProgressLabel('サーバーにデータを送信しています...');
+
+      const ttmString = calculateTtm();
+      const ttmValue =
+        selectedCustomer.currency === '$' && ttmString !== ''
+          ? Number(ttmString)
+          : null;
+
+      const response = await fetch(
+        'http://localhost:3001/api/invoices/upload',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            companyId: selectedCustomer.id,
+            companyCode: selectedCustomer.company_code,
+            companyName: selectedCustomer.company_name,
+            issuedDate: issuedMonth,
+            currency: selectedCustomer.currency,
+            ttm: ttmValue,
+            summaries: validationResult.records,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        let errorMessages: string[] = [
+          'アップロードに失敗しました。時間をおいて再度お試しください。',
+        ];
+
+        try {
+          const errorBody = await response.json();
+          if (Array.isArray(errorBody?.error)) {
+            errorMessages = errorBody.error;
+          } else if (typeof errorBody?.error === 'string') {
+            errorMessages = [errorBody.error];
+          }
+        } catch (parseError) {
+          console.error('Failed to parse error response:', parseError);
+        }
+
+        setModalMode('error');
+        setModalMessages(errorMessages);
+        setUploadProgress(0);
+        setUploadProgressLabel('');
+        return;
+      }
+
+      const result = await response.json();
+
+      setUploadProgress(100);
+      setUploadProgressLabel('アップロードが完了しました。');
+      setUploadResult({
+        invoiceCode: result.invoice.invoice_code,
+        issuedDate: result.invoice.issued_date,
+      });
+      setModalMode('success');
     } catch (error) {
       console.error('Error submitting invoice data:', error);
-      alert('登録処理に失敗しました。時間をおいて再度お試しください。');
+      const fallbackMessages =
+        error instanceof Error
+          ? ['ファイルの処理中にエラーが発生しました。', error.message]
+          : ['ファイルの処理中に予期せぬエラーが発生しました。'];
+      setModalMode('error');
+      setModalMessages(fallbackMessages);
+      setUploadProgress(0);
+      setUploadProgressLabel('');
     } finally {
       setIsSubmitting(false);
     }
@@ -454,62 +770,169 @@ export const CreateInvoicePage = () => {
             role="dialog"
             aria-modal="true"
           >
-            <div className="confirm-modal">
-              <div className="confirm-modal__icon">
-                <img src={questionIcon} alt="確認" />
+            <div className={`confirm-modal confirm-modal--${modalMode}`}>
+              <div
+                className={`confirm-modal__icon confirm-modal__icon--${modalMode}`}
+              >
+                <img
+                  src={modalMode === 'error' ? warningIcon : questionIcon}
+                  alt={modalMode === 'error' ? '警告' : '確認'}
+                />
               </div>
               <div className="confirm-modal__body">
-                <p className="confirm-modal__message">
-                  以下の内容で登録します。よろしいですか？
-                  <br />
-                  重複データは上書きされます。
-                </p>
-                <ul className="confirm-modal__summary">
-                  <li className="confirm-modal__summary-item">
-                    <span className="summary-label">利用顧客名</span>
-                    <span className="summary-value">
-                      {selectedCustomerDisplayName || '未選択'}
-                    </span>
-                  </li>
-                  <li className="confirm-modal__summary-item">
-                    <span className="summary-label">利用年月</span>
-                    <span className="summary-value">
-                      {year && month ? `${year}年${month}月` : '-'}
-                    </span>
-                  </li>
-                  {selectedCustomer?.currency === '$' && (
-                    <li className="confirm-modal__summary-item">
-                      <span className="summary-label">為替レート(TTM)</span>
-                      <span className="summary-value summary-value--single">
-                        {calculateTtm() || '-'}
-                      </span>
-                    </li>
-                  )}
-                  <li className="confirm-modal__summary-item">
-                    <span className="summary-label">元データ</span>
-                    <span className="summary-value summary-value--file">
-                      {uploadedFile?.name || '未選択'}
-                    </span>
-                  </li>
-                </ul>
+                {modalMode === 'confirm' && (
+                  <>
+                    <p className="confirm-modal__message">
+                      以下の内容で登録します。よろしいですか？
+                      <br />
+                      重複データは上書きされます。
+                    </p>
+                    <ul className="confirm-modal__summary">
+                      <li className="confirm-modal__summary-item">
+                        <span className="summary-label">利用顧客名</span>
+                        <span className="summary-value">
+                          {selectedCustomerDisplayName || '未選択'}
+                        </span>
+                      </li>
+                      <li className="confirm-modal__summary-item">
+                        <span className="summary-label">利用年月</span>
+                        <span className="summary-value">
+                          {year && month ? `${year}年${month}月` : '-'}
+                        </span>
+                      </li>
+                      {selectedCustomer?.currency === '$' && (
+                        <li className="confirm-modal__summary-item">
+                          <span className="summary-label">為替レート(TTM)</span>
+                          <span className="summary-value summary-value--single">
+                            {calculateTtm() || '-'}
+                          </span>
+                        </li>
+                      )}
+                      <li className="confirm-modal__summary-item">
+                        <span className="summary-label">元データ</span>
+                        <span className="summary-value summary-value--file">
+                          {uploadedFile?.name || '未選択'}
+                        </span>
+                      </li>
+                    </ul>
+                  </>
+                )}
+                {modalMode === 'processing' && (
+                  <div className="confirm-modal__progress">
+                    <div className="progress-gauge">
+                      <div
+                        className="progress-gauge__bar"
+                        style={{ width: `${Math.min(uploadProgress, 100)}%` }}
+                      ></div>
+                    </div>
+                    <div className="confirm-modal__progress-label">
+                      {uploadProgressLabel || '処理中...'}
+                    </div>
+                  </div>
+                )}
+                {modalMode === 'error' && (
+                  <div className="confirm-modal__error">
+                    {modalMessages.map((message, index) => (
+                      <p
+                        key={`${message}-${index}`}
+                        className="confirm-modal__error-line"
+                      >
+                        {message}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                {modalMode === 'success' && (
+                  <div className="confirm-modal__success">
+                    <p className="confirm-modal__success-message">
+                      元データーのアップロードが成功しました。
+                      <br />
+                      請求書発行ページに移動しますか？
+                    </p>
+                    {uploadResult && (
+                      <div className="confirm-modal__success-summary">
+                        <div className="confirm-modal__success-item">
+                          <span className="summary-label">利用年月</span>
+                          <span className="summary-value">
+                            {uploadResult.issuedDate}
+                          </span>
+                        </div>
+                        <div className="confirm-modal__success-item">
+                          <span className="summary-label">請求書番号</span>
+                          <span className="summary-value">
+                            {uploadResult.invoiceCode}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="confirm-modal__actions">
-                <button
-                  type="button"
-                  className="btn btn-cancel"
-                  onClick={handleModalCancel}
-                  disabled={isSubmitting}
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-submit"
-                  onClick={handleModalConfirm}
-                  disabled={isSubmitting}
-                >
-                  続行
-                </button>
+                {modalMode === 'confirm' && (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-cancel"
+                      onClick={handleModalCancel}
+                      disabled={isSubmitting}
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-submit"
+                      onClick={handleModalConfirm}
+                      disabled={isSubmitting}
+                    >
+                      続行
+                    </button>
+                  </>
+                )}
+                {modalMode === 'processing' && (
+                  <button type="button" className="btn btn-cancel" disabled>
+                    処理中...
+                  </button>
+                )}
+                {modalMode === 'error' && (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-cancel"
+                      onClick={handleModalCancel}
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-submit"
+                      onClick={() => {
+                        setModalMode('confirm');
+                        setModalMessages([]);
+                      }}
+                    >
+                      戻る
+                    </button>
+                  </>
+                )}
+                {modalMode === 'success' && (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-cancel"
+                      onClick={handleModalCancel}
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-submit"
+                      onClick={handleSuccessNavigate}
+                    >
+                      移動
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>

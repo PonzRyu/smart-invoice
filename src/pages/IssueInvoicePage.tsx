@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { TopBar } from '../parts/TopBar';
 import { NavigationRail } from '../parts/NavigationRail';
 import { BottomBar } from '../parts/BottomBar';
@@ -26,6 +27,10 @@ interface IssuedInvoice {
 }
 
 export const IssueInvoicePage = () => {
+  const location = useLocation();
+  const preselectedCompanyCode = (
+    location.state as { companyCode?: string } | null
+  )?.companyCode;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCompanyCode, setSelectedCompanyCode] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
@@ -66,7 +71,7 @@ export const IssueInvoicePage = () => {
     fetchCustomers();
   }, []);
 
-  const fetchIssuedInvoices = async (companyCode: string) => {
+  const fetchIssuedInvoices = useCallback(async (companyCode: string) => {
     setIsLoadingInvoices(true);
     setErrorMessage('');
     try {
@@ -101,7 +106,7 @@ export const IssueInvoicePage = () => {
     } finally {
       setIsLoadingInvoices(false);
     }
-  };
+  }, []);
 
   const handleCustomerChange = (
     event: React.ChangeEvent<HTMLSelectElement>
@@ -122,6 +127,18 @@ export const IssueInvoicePage = () => {
     setSelectedCustomer(customer ?? null);
     fetchIssuedInvoices(companyCode);
   };
+  useEffect(() => {
+    if (!preselectedCompanyCode || customers.length === 0) {
+      return;
+    }
+    const companyCode = preselectedCompanyCode;
+    setSelectedCompanyCode(companyCode);
+    const customer = customers.find(
+      (item) => item.company_code === companyCode
+    );
+    setSelectedCustomer(customer ?? null);
+    fetchIssuedInvoices(companyCode);
+  }, [customers, fetchIssuedInvoices, preselectedCompanyCode]);
 
   const handlePreviousPage = () => {
     if (currentPage > 1) {

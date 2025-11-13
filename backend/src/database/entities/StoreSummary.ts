@@ -1,7 +1,17 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Index,
+} from 'typeorm';
 import { CustomerInfo } from './CustomerInfo';
 
 @Entity('store_summary')
+@Index(['company_code', 'store_code', 'date'], { unique: true })
 export class StoreSummary {
   @CreateDateColumn()
   created_at: Date;
@@ -12,14 +22,14 @@ export class StoreSummary {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'integer', nullable: false })
-  company_code: number;
-
-  @Column({ type: 'integer', nullable: false })
-  store_code: number;
+  @Column({ type: 'text', nullable: false })
+  company_code: string;
 
   @Column({ type: 'text', nullable: false })
-  store_name: string;
+  store_code: string;
+
+  @Column({ type: 'text', nullable: true })
+  store_name: string | null;
 
   @Column({ type: 'date', nullable: false })
   date: Date;
@@ -30,8 +40,11 @@ export class StoreSummary {
   @Column({ type: 'integer', nullable: false })
   product_updated: number;
 
-  @ManyToOne(() => CustomerInfo, (customerInfo: CustomerInfo) => customerInfo.storeSummaries)
-  @JoinColumn({ name: 'company_code' })
+  @ManyToOne(
+    () => CustomerInfo,
+    (customerInfo: CustomerInfo) => customerInfo.storeSummaries,
+    { nullable: false }
+  )
+  @JoinColumn({ name: 'company_code', referencedColumnName: 'company_code' })
   customerInfo!: CustomerInfo;
 }
-
