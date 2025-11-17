@@ -45,17 +45,25 @@ function formatDateJapanese(date: Date): string {
 /**
  * 日付をYYYY年MM月dd日形式に変換
  */
-function formatDateJapaneseWithZero(date: Date): string {
+function formatDateJapaneseWithZero(
+  date: Date,
+  isIncludeDay: boolean = true
+): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
-  return `${year}年${month}月`;
+  if (!isIncludeDay) {
+    return `${year}年${month}月`;
+  }
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}年${month}月${day}日`;
 }
 
 /**
  * 請求月の翌月末日を取得
  */
-function getNextMonthEndDate(issuedDate: string): Date {
-  const [year, month] = issuedDate.split('-').map(Number);
+function getNextMonthEndDate(date: Date): Date {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
   // 請求月の翌月 = month + 1
   // 翌月の0日目 = 前月の最終日
   const nextMonth = month === 12 ? 1 : month + 1;
@@ -107,7 +115,7 @@ export async function generateInvoiceExcel(
 
   // 請求年月日: ダウンロードボタンを押下した日付
   const requestDateStr = formatDateJapanese(invoiceData.downloadDate);
-
+  console.log(invoiceData.downloadDate);
   // 請求書件名: ${issued_invoice.company_name}様向けAIMS SaaS${MM}月度ご利用料金
   const usageDate = getUsageYearMonthDate(invoiceData.issuedDate);
   const monthStr = String(usageDate.getMonth() + 1).padStart(2, '0');
@@ -115,7 +123,7 @@ export async function generateInvoiceExcel(
   summarySheet.getCell('F10').value = invoiceTitle;
 
   // 支払い期限: 請求月の翌月末日
-  const paymentDeadline = getNextMonthEndDate(invoiceData.issuedDate);
+  const paymentDeadline = getNextMonthEndDate(invoiceData.downloadDate);
   const paymentDeadlineStr = formatDateJapaneseWithZero(paymentDeadline);
   summarySheet.getCell('F11').value = paymentDeadlineStr;
 
@@ -126,7 +134,7 @@ export async function generateInvoiceExcel(
 
   // ヘッダを設定
   // 店舗別明細の年月生成: ${YYYY年MM月dd日}店舗別ご利用明細
-  const usageDateStr = formatDateJapaneseWithZero(usageDate);
+  const usageDateStr = formatDateJapaneseWithZero(usageDate, false);
   const headerLeft = `${usageDateStr}店舗別ご利用明細`;
   const headerRight = invoiceNumber;
   const summeryHeaderRight = requestDateStr;
