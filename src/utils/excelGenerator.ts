@@ -131,7 +131,7 @@ export async function generateInvoiceExcel(
   const headerRight = invoiceNumber;
   const summeryHeaderRight = requestDateStr;
   summarySheet.headerFooter = {
-    oddHeader: `&L${headerLeft}&R${headerRight}\r\n${summeryHeaderRight}`,
+    oddHeader: `&R${headerRight}\r\n${summeryHeaderRight}`,
     evenHeader: `&L${headerLeft}&R${headerRight}`,
     // 必要に応じてoddFooterやevenFooterも設定可能
   };
