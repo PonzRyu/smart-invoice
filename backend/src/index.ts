@@ -489,6 +489,47 @@ app.get('/api/issued-invoices', async (req, res) => {
   }
 });
 
+// 店舗別明細データ取得
+app.get('/api/store-summaries', async (req, res) => {
+  try {
+    const { companyCode, issuedDate } = req.query;
+
+    if (typeof companyCode !== 'string' || companyCode.trim() === '') {
+      return res.status(400).json({ error: 'companyCode is required' });
+    }
+
+    if (typeof issuedDate !== 'string' || issuedDate.trim() === '') {
+      return res.status(400).json({ error: 'issuedDate is required' });
+    }
+
+    // issuedDateはYYYY-MM形式なので、その月の範囲で検索
+    const [year, month] = issuedDate.split('-');
+    if (!year || !month) {
+      return res.status(400).json({ error: 'issuedDate format is invalid (YYYY-MM)' });
+    }
+
+    const startDate = new Date(`${year}-${month}-01T00:00:00.000Z`);
+    const endDate = new Date(
+      new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).setHours(23, 59, 59, 999)
+    );
+
+    const storeSummaryRepository = AppDataSource.getRepository(StoreSummary);
+    const summaries = await storeSummaryRepository
+      .createQueryBuilder('store_summary')
+      .where('store_summary.company_code = :companyCode', { companyCode })
+      .andWhere('store_summary.date >= :startDate', { startDate })
+      .andWhere('store_summary.date <= :endDate', { endDate })
+      .orderBy('store_summary.date', 'ASC')
+      .addOrderBy('store_summary.store_code', 'ASC')
+      .getMany();
+
+    res.json(summaries);
+  } catch (error) {
+    console.error('Error fetching store summaries:', error);
+    res.status(500).json({ error: 'Failed to fetch store summaries' });
+  }
+});
+
 // Initialize database connection
 AppDataSource.initialize()
   .then(() => {

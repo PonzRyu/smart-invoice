@@ -7,6 +7,8 @@ import arrowBackIcon from '../styles/raws/list_arrow_back_raw.svg';
 import arrowNextIcon from '../styles/raws/list_arrow_next_raw.svg';
 import arrowDropDownIcon from '../styles/raws/arrow_drop_down_raw.svg';
 import downloadIcon from '../styles/raws/download_raw.svg';
+import { generateInvoiceExcel } from '../utils/excelGenerator';
+import templateUrl from '../assets/invoice_template.xlsx?url';
 import '../styles/styles.css';
 
 interface Customer {
@@ -45,6 +47,9 @@ export const IssueInvoicePage = () => {
   const [excessBillingMap, setExcessBillingMap] = useState<
     Record<number, boolean>
   >({});
+  const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<
+    number | null
+  >(null);
 
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -195,6 +200,52 @@ export const IssueInvoicePage = () => {
       const nextMap = { ...prev, [invoiceId]: nextValue };
       return nextMap;
     });
+  };
+
+  const handleDownloadInvoice = async (invoice: IssuedInvoice) => {
+    if (downloadingInvoiceId !== null) {
+      return; // 既にダウンロード処理中
+    }
+
+    setDownloadingInvoiceId(invoice.id);
+    setErrorMessage('');
+
+    try {
+      // 店舗別明細データを取得
+      const storeSummaryResponse = await fetch(
+        `http://localhost:3001/api/store-summaries?companyCode=${encodeURIComponent(
+          invoice.company_code
+        )}&issuedDate=${encodeURIComponent(invoice.issued_date)}`
+      );
+
+      if (!storeSummaryResponse.ok) {
+        throw new Error('店舗別明細データの取得に失敗しました。');
+      }
+
+      const storeSummaries = await storeSummaryResponse.json();
+
+      // Excelファイルを生成してダウンロード
+      await generateInvoiceExcel(
+        templateUrl,
+        {
+          invoiceCode: invoice.invoice_code,
+          issuedDate: invoice.issued_date,
+          companyName: invoice.company_name,
+          ttm: invoice.ttm,
+          downloadDate: new Date(),
+        },
+        storeSummaries
+      );
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : '請求書のダウンロードに失敗しました。'
+      );
+    } finally {
+      setDownloadingInvoiceId(null);
+    }
   };
 
   const startIndex =
@@ -379,8 +430,9 @@ export const IssueInvoicePage = () => {
                         <button
                           type="button"
                           className="issue-invoice-download-button"
-                          title="ダウンロード機能は現在利用できません"
-                          disabled
+                          title="請求書をダウンロード"
+                          onClick={() => handleDownloadInvoice(invoice)}
+                          disabled={downloadingInvoiceId === invoice.id}
                         >
                           <img
                             src={downloadIcon}

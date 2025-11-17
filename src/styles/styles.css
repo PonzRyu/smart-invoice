@@ -1760,12 +1760,30 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.issue-invoice-download-button:hover:not(:disabled) {
+  opacity: 0.8;
+}
+
+.issue-invoice-download-button:active:not(:disabled) {
+  opacity: 0.6;
+}
+
+.issue-invoice-download-button:disabled {
   cursor: not-allowed;
 }
 
 .issue-invoice-download-icon {
   width: 20px;
   height: 20px;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.issue-invoice-download-button:disabled .issue-invoice-download-icon {
   opacity: 0.4;
 }
 
