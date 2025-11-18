@@ -3,6 +3,8 @@ import homeIcon from '../styles/raws/home_raw.svg';
 import createInvoiceIcon from '../styles/raws/create_invoice_raw.svg';
 import issueInvoiceIcon from '../styles/raws/issue_an_invoice_raw.svg';
 import customerManagementIcon from '../styles/raws/customer_management_raw.svg';
+import manualIcon from '../styles/raws/manual_raw.svg';
+import releaseNoteIcon from '../styles/raws/release_note_raw.svg';
 
 /**
  * ナビゲーションレールコンポーネント
@@ -27,6 +29,16 @@ export const NavigationRail = () => {
       icon: customerManagementIcon,
       title: '顧客管理',
       path: '/Customers',
+    },
+    {
+      icon: manualIcon,
+      title: 'マニュアル',
+      path: '/Manual',
+    },
+    {
+      icon: releaseNoteIcon,
+      title: '変更履歴',
+      path: '/ReleaseNotes',
     },
   ];
 
