@@ -16,6 +16,7 @@ interface Customer {
   company_name: string;
   company_code: string;
   currency: string;
+  unit_price: number;
 }
 
 interface IssuedInvoice {
@@ -234,7 +235,9 @@ export const IssueInvoicePage = () => {
           ttm: invoice.ttm,
           downloadDate: new Date(),
         },
-        storeSummaries
+        storeSummaries,
+        selectedCustomer?.unit_price!,
+        selectedCustomer?.currency!
       );
     } catch (error) {
       console.error(error);

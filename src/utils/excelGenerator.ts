@@ -1,13 +1,12 @@
 import ExcelJS from 'exceljs';
 
 interface StoreSummary {
-  id: number;
-  company_code: string;
   store_code: string;
   store_name: string | null;
-  date: string;
-  total_labels: number;
-  product_updated: number;
+  start_date_of_use: string;
+  usage_days: number;
+  avg_label_count: number;
+  avg_product_update_count: number;
 }
 
 interface InvoiceData {
@@ -86,7 +85,9 @@ function getUsageYearMonthDate(issuedDate: string): Date {
 export async function generateInvoiceExcel(
   templateUrl: string,
   invoiceData: InvoiceData,
-  storeSummaries: StoreSummary[]
+  storeSummaries: StoreSummary[],
+  unitPrice: number,
+  currency: string
 ): Promise<void> {
   // テンプレートファイルを読み込み
   const response = await fetch(templateUrl);
@@ -132,6 +133,24 @@ export async function generateInvoiceExcel(
     summarySheet.getCell('N15').value = invoiceData.ttm;
   }
 
+  // 小計
+  summarySheet.getCell('E15').numFmt = `"${currency}"#,##0.000`;
+  summarySheet.getCell('E15').value = {
+    formula: `=SUM(店舗別明細!H3:H1048576)`,
+  };
+
+  // 消費税(ドル)
+  summarySheet.getCell('J15').numFmt = `"${currency}"#,##0.000`;
+  summarySheet.getCell('J15').value = {
+    formula: `=E15*0.1`,
+  };
+
+  // 合計ご請求金額
+  summarySheet.getCell('R15').numFmt = `"¥"#,##0.000`;
+  summarySheet.getCell('R15').value = {
+    formula: `=SUM(E15, J15)*N15`,
+  };
+
   // ヘッダを設定
   // 店舗別明細の年月生成: ${YYYY年MM月dd日}店舗別ご利用明細
   const usageDateStr = formatDateJapaneseWithZero(usageDate, false);
@@ -151,6 +170,105 @@ export async function generateInvoiceExcel(
     evenHeader: `&L${headerLeft}&R${headerRight}`,
     // 必要に応じてoddFooterやevenFooterも設定可能
   };
+
+  // 店舗別明細データを「店舗別明細」シートに書き込む
+  // 3行目からスタート
+  const startRow = 3;
+  storeSummaries.forEach((summary, index) => {
+    const row = startRow + index;
+
+    // B列: store_code
+    const cellB = storeSheet.getCell(`B${row}`);
+    cellB.value = summary.store_code;
+
+    // C列: store_name
+    const cellC = storeSheet.getCell(`C${row}`);
+    cellC.value = summary.store_name ?? '';
+
+    // D列: usage_days
+    const cellD = storeSheet.getCell(`D${row}`);
+    cellD.numFmt = '#,##0"日"';
+    cellD.value = summary.usage_days;
+
+    // E列: avg_label_count
+    const cellE = storeSheet.getCell(`E${row}`);
+    cellE.numFmt = '#,##0"枚"';
+    cellE.value = summary.avg_label_count;
+
+    // F列: avg_product_update_count
+    const cellF = storeSheet.getCell(`F${row}`);
+    cellF.numFmt = '#,##0"回"';
+    cellF.value = summary.avg_product_update_count;
+
+    const cellG = storeSheet.getCell(`G${row}`);
+    cellG.numFmt = '0.00%';
+    cellG.value = {
+      formula: `=IFERROR(店舗別明細!$F${row}/店舗別明細!$E${row},"")`,
+    };
+
+    const cellH = storeSheet.getCell(`H${row}`);
+    cellH.numFmt = `"${currency}"#,##0.000`;
+    cellH.value = {
+      formula: `=IF(店舗別明細!$D${row}=0,"",ROUND(店舗別明細!$E${row}*${unitPrice},3))`,
+    };
+
+    // 枠線を設定（外枠）
+    const borderStyle: Partial<ExcelJS.Border> = {
+      style: 'thin',
+    };
+
+    cellB.border = {
+      top: borderStyle,
+      left: borderStyle,
+      bottom: borderStyle,
+      right: borderStyle,
+    };
+    cellC.border = {
+      top: borderStyle,
+      left: borderStyle,
+      bottom: borderStyle,
+      right: borderStyle,
+    };
+    cellD.border = {
+      top: borderStyle,
+      left: borderStyle,
+      bottom: borderStyle,
+      right: borderStyle,
+    };
+    cellE.border = {
+      top: borderStyle,
+      left: borderStyle,
+      bottom: borderStyle,
+      right: borderStyle,
+    };
+    cellF.border = {
+      top: borderStyle,
+      left: borderStyle,
+      bottom: borderStyle,
+      right: borderStyle,
+    };
+    cellG.border = {
+      top: borderStyle,
+      left: borderStyle,
+      bottom: borderStyle,
+      right: borderStyle,
+    };
+    cellH.border = {
+      top: borderStyle,
+      left: borderStyle,
+      bottom: borderStyle,
+      right: borderStyle,
+    };
+
+    const rowObj = storeSheet.getRow(row);
+    rowObj.alignment = {
+      horizontal: 'right',
+      vertical: 'middle',
+    };
+    rowObj.font = { name: '游ゴシック', size: 10 };
+  });
+
+  storeSheet.pageSetup.printArea = `A1:I${storeSummaries.length + 3}`;
 
   // ExcelファイルをBlobに変換してダウンロード
   const buffer = await workbook.xlsx.writeBuffer();

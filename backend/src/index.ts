@@ -489,7 +489,7 @@ app.get('/api/issued-invoices', async (req, res) => {
   }
 });
 
-// 店舗別明細データ取得
+// 店舗別明細データ取得（集計済み）
 app.get('/api/store-summaries', async (req, res) => {
   try {
     const { companyCode, issuedDate } = req.query;
@@ -502,28 +502,56 @@ app.get('/api/store-summaries', async (req, res) => {
       return res.status(400).json({ error: 'issuedDate is required' });
     }
 
-    // issuedDateはYYYY-MM形式なので、その月の範囲で検索
+    // issuedDateはYYYY-MM形式
     const [year, month] = issuedDate.split('-');
     if (!year || !month) {
-      return res.status(400).json({ error: 'issuedDate format is invalid (YYYY-MM)' });
+      return res
+        .status(400)
+        .json({ error: 'issuedDate format is invalid (YYYY-MM)' });
     }
 
-    const startDate = new Date(`${year}-${month}-01T00:00:00.000Z`);
-    const endDate = new Date(
-      new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).setHours(23, 59, 59, 999)
-    );
+    // プロンプトのSQLクエリに基づいた集計処理
+    const query = `
+      WITH started AS (
+        SELECT 
+          company_code,
+          store_code,
+          MIN(date) AS start_date_of_use
+        FROM store_summary
+        WHERE company_code = $1 
+          AND total_labels > 0
+        GROUP BY company_code, store_code
+      )
+      SELECT 
+        b.store_code AS store_code,
+        b.store_name AS store_name,
+        s.start_date_of_use AS start_date_of_use,
+        COUNT(DISTINCT CASE WHEN b.total_labels > 0 THEN b.date END) AS usage_days,
+        ROUND(AVG(CASE WHEN b.total_labels > 0 THEN b.total_labels END), 3) AS avg_label_count,
+        ROUND(AVG(CASE WHEN b.total_labels > 0 THEN b.product_updated END), 3) AS avg_product_update_count
+      FROM store_summary b
+      JOIN started s
+        ON b.company_code = s.company_code
+       AND b.store_code = s.store_code
+      WHERE b.company_code = $1
+        AND TO_CHAR(b.date, 'YYYY-MM') = $2
+      GROUP BY b.store_code, b.store_name, s.start_date_of_use
+      ORDER BY s.start_date_of_use, b.store_code
+    `;
 
-    const storeSummaryRepository = AppDataSource.getRepository(StoreSummary);
-    const summaries = await storeSummaryRepository
-      .createQueryBuilder('store_summary')
-      .where('store_summary.company_code = :companyCode', { companyCode })
-      .andWhere('store_summary.date >= :startDate', { startDate })
-      .andWhere('store_summary.date <= :endDate', { endDate })
-      .orderBy('store_summary.date', 'ASC')
-      .addOrderBy('store_summary.store_code', 'ASC')
-      .getMany();
+    const result = await AppDataSource.query(query, [companyCode, issuedDate]);
 
-    res.json(summaries);
+    // 結果を正規化
+    const normalizedResult = result.map((row: any) => ({
+      store_code: row.store_code,
+      store_name: row.store_name,
+      start_date_of_use: row.start_date_of_use,
+      usage_days: parseInt(row.usage_days, 10),
+      avg_label_count: parseFloat(row.avg_label_count),
+      avg_product_update_count: parseFloat(row.avg_product_update_count),
+    }));
+
+    res.json(normalizedResult);
   } catch (error) {
     console.error('Error fetching store summaries:', error);
     res.status(500).json({ error: 'Failed to fetch store summaries' });
