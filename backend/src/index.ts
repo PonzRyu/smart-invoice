@@ -2,10 +2,12 @@ import 'reflect-metadata';
 import express from 'express';
 import cors from 'cors';
 import { config } from 'dotenv';
+import { In } from 'typeorm';
 import { AppDataSource } from './database/data-source';
 import { CustomerInfo } from './database/entities/CustomerInfo';
 import { IssuedInvoice } from './database/entities/IssuedInvoice';
 import { StoreSummary } from './database/entities/StoreSummary';
+import { StoreMaster } from './database/entities/StoreMaster';
 
 config();
 
@@ -390,6 +392,7 @@ app.post('/api/invoices/upload', async (req, res) => {
       const storeSummaryRepository = manager.getRepository(StoreSummary);
       const issuedInvoiceRepository = manager.getRepository(IssuedInvoice);
       const customerRepository = manager.getRepository(CustomerInfo);
+      const storeMasterRepository = manager.getRepository(StoreMaster);
 
       const customer = await customerRepository.findOne({
         where: { id: companyId, company_code: companyCode },
@@ -399,18 +402,50 @@ app.post('/api/invoices/upload', async (req, res) => {
         throw new Error('指定された顧客が見つかりません。');
       }
 
-      const storeSummariesToSave = Array.from(storeSummaryMap.values()).map(
-        (item) => {
-          const storeSummary = new StoreSummary();
-          storeSummary.company_code = companyCode;
-          storeSummary.store_code = item.storeCode;
-          storeSummary.store_name = item.storeName;
-          storeSummary.date = new Date(`${item.dateString}T00:00:00.000Z`);
-          storeSummary.total_labels = item.totalLabels;
-          storeSummary.product_updated = item.productUpdated;
-          return storeSummary;
+      // storeNameがnullのレコードに対して、store_masterから取得
+      const storeSummariesArray = Array.from(storeSummaryMap.values());
+      const storeCodesNeedingName = storeSummariesArray
+        .filter((item) => item.storeName === null)
+        .map((item) => item.storeCode);
+
+      if (storeCodesNeedingName.length > 0) {
+        const uniqueStoreCodes = Array.from(new Set(storeCodesNeedingName));
+        const storeMasters = await storeMasterRepository.find({
+          where: {
+            company_code: companyCode,
+            store_code: In(uniqueStoreCodes),
+          },
+        });
+
+        // store_codeでマップを作成
+        const storeMasterMap = new Map<string, string>();
+        for (const storeMaster of storeMasters) {
+          if (storeMaster.company_code === companyCode) {
+            storeMasterMap.set(storeMaster.store_code, storeMaster.store_name);
+          }
         }
-      );
+
+        // storeNameがnullのレコードを更新
+        for (const item of storeSummariesArray) {
+          if (item.storeName === null) {
+            const masterStoreName = storeMasterMap.get(item.storeCode);
+            if (masterStoreName) {
+              item.storeName = masterStoreName;
+            }
+          }
+        }
+      }
+
+      const storeSummariesToSave = storeSummariesArray.map((item) => {
+        const storeSummary = new StoreSummary();
+        storeSummary.company_code = companyCode;
+        storeSummary.store_code = item.storeCode;
+        storeSummary.store_name = item.storeName;
+        storeSummary.date = new Date(`${item.dateString}T00:00:00.000Z`);
+        storeSummary.total_labels = item.totalLabels;
+        storeSummary.product_updated = item.productUpdated;
+        return storeSummary;
+      });
 
       if (storeSummariesToSave.length > 0) {
         await storeSummaryRepository.upsert(storeSummariesToSave, [
@@ -420,23 +455,39 @@ app.post('/api/invoices/upload', async (req, res) => {
         ]);
       }
 
-      const lastInvoice = await issuedInvoiceRepository.findOne({
-        where: { issued_date: issuedDate },
-        order: { invoice_code: 'DESC' },
+      // 同じ月に同じcompany_codeで既存の請求書があるか確認
+      const existingInvoice = await issuedInvoiceRepository.findOne({
+        where: {
+          company_code: companyCode,
+          issued_date: issuedDate,
+        },
       });
 
-      const nextInvoiceCode = lastInvoice ? lastInvoice.invoice_code + 1 : 1;
+      let savedIssuedInvoice: IssuedInvoice;
 
-      const issuedInvoiceEntity = new IssuedInvoice();
-      issuedInvoiceEntity.company_code = companyCode;
-      issuedInvoiceEntity.company_name = companyName;
-      issuedInvoiceEntity.issued_date = issuedDate;
-      issuedInvoiceEntity.invoice_code = nextInvoiceCode;
-      issuedInvoiceEntity.currency = currency;
-      issuedInvoiceEntity.ttm = ttm ?? null;
+      if (existingInvoice) {
+        // 既存の請求書が存在する場合は、そのまま使用
+        savedIssuedInvoice = existingInvoice;
+      } else {
+        // 既存の請求書が存在しない場合は、新しい請求書番号を発行
+        const lastInvoice = await issuedInvoiceRepository.findOne({
+          where: { issued_date: issuedDate },
+          order: { invoice_code: 'DESC' },
+        });
 
-      const savedIssuedInvoice =
-        await issuedInvoiceRepository.save(issuedInvoiceEntity);
+        const nextInvoiceCode = lastInvoice ? lastInvoice.invoice_code + 1 : 1;
+
+        const issuedInvoiceEntity = new IssuedInvoice();
+        issuedInvoiceEntity.company_code = companyCode;
+        issuedInvoiceEntity.company_name = companyName;
+        issuedInvoiceEntity.issued_date = issuedDate;
+        issuedInvoiceEntity.invoice_code = nextInvoiceCode;
+        issuedInvoiceEntity.currency = currency;
+        issuedInvoiceEntity.ttm = ttm ?? null;
+
+        savedIssuedInvoice =
+          await issuedInvoiceRepository.save(issuedInvoiceEntity);
+      }
 
       return savedIssuedInvoice;
     });
