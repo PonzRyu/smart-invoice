@@ -48,7 +48,15 @@ export const NavigationRail = () => {
 
   const handleNavItemClick = (path: string) => {
     if (path) {
-      navigate(path);
+      // マニュアルの場合は外部URLを開く
+      if (path === '/Manual') {
+        window.open('https://www.notion.so/aims-saas-invoice/AIMS-SaaS-INVOICE-2b0a74c4566c8047b8f8f5ac0b112611', '_blank');
+      } else if (path === '/ReleaseNotes') {
+        // 変更履歴の場合は外部URLを開く
+        window.open('https://aims-saas-invoice.notion.site/AIMS-SaaS-INVOICE-2b0a74c4566c801c929ffaae32cf42cc?pvs=73', '_blank');
+      } else {
+        navigate(path);
+      }
     }
   };
 
