@@ -58,6 +58,7 @@ export const IssueInvoicePage = () => {
     null
   );
   const [billingDate, setBillingDate] = useState<string>('');
+  const [paymentDeadline, setPaymentDeadline] = useState<string>('');
 
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -215,13 +216,21 @@ export const IssueInvoicePage = () => {
       return; // 既にダウンロード処理中
     }
 
-    // 前月の末日をデフォルト値として設定
+    // 前月の末日をデフォルト値として設定（請求日時）
     const today = new Date();
     const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0); // 前月の末日
     const year = lastMonth.getFullYear();
     const month = String(lastMonth.getMonth() + 1).padStart(2, '0');
     const day = String(lastMonth.getDate()).padStart(2, '0');
     setBillingDate(`${year}-${month}-${day}`);
+
+    // 翌月の末日をデフォルト値として設定（支払期限）
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 2, 0); // 翌月の末日
+    const nextYear = nextMonth.getFullYear();
+    const nextMonthNum = String(nextMonth.getMonth() + 1).padStart(2, '0');
+    const nextDay = String(nextMonth.getDate()).padStart(2, '0');
+    setPaymentDeadline(`${nextYear}-${nextMonthNum}-${nextDay}`);
+
     setPendingInvoice(invoice);
     setIsBillingDateDialogOpen(true);
   };
@@ -230,10 +239,11 @@ export const IssueInvoicePage = () => {
     setIsBillingDateDialogOpen(false);
     setPendingInvoice(null);
     setBillingDate('');
+    setPaymentDeadline('');
   };
 
   const handleBillingDateDialogConfirm = async () => {
-    if (!pendingInvoice || !billingDate) {
+    if (!pendingInvoice || !billingDate || !paymentDeadline) {
       return;
     }
 
@@ -256,7 +266,8 @@ export const IssueInvoicePage = () => {
       const storeSummaries = await storeSummaryResponse.json();
 
       // 選択された日付をDateオブジェクトに変換
-      const selectedDate = new Date(billingDate);
+      const selectedBillingDate = new Date(billingDate);
+      const selectedPaymentDeadline = new Date(paymentDeadline);
 
       // Excelファイルを生成してダウンロード
       await generateInvoiceExcel(
@@ -266,7 +277,8 @@ export const IssueInvoicePage = () => {
           issuedDate: pendingInvoice.issued_date,
           companyName: pendingInvoice.company_name,
           ttm: pendingInvoice.ttm,
-          billingDate: selectedDate,
+          billingDate: selectedBillingDate,
+          paymentDeadline: selectedPaymentDeadline,
         },
         storeSummaries,
         selectedCustomer?.unit_price!,
@@ -283,6 +295,7 @@ export const IssueInvoicePage = () => {
       setDownloadingInvoiceId(null);
       setPendingInvoice(null);
       setBillingDate('');
+      setPaymentDeadline('');
     }
   };
 
@@ -467,7 +480,7 @@ export const IssueInvoicePage = () => {
                       <div className="customer-list-cell issue-invoice-cell">
                         <button
                           type="button"
-                          className="issue-invoice-download-button"
+                          className="action-icon-button"
                           title="請求書をダウンロード"
                           onClick={() => handleDownloadInvoice(invoice)}
                           disabled={downloadingInvoiceId === invoice.id}
@@ -475,7 +488,7 @@ export const IssueInvoicePage = () => {
                           <img
                             src={downloadIcon}
                             alt="ダウンロード"
-                            className="issue-invoice-download-icon"
+                            className="action-icon"
                           />
                         </button>
                       </div>
@@ -507,9 +520,7 @@ export const IssueInvoicePage = () => {
               <img src={questionIcon} alt="確認" />
             </div>
             <div className="confirm-modal__body">
-              <p className="confirm-modal__message">
-                請求日時を選択してください
-              </p>
+              <p className="confirm-modal__message">日付を選択してください。</p>
               <div className="form-group" style={{ marginTop: '16px' }}>
                 <label
                   htmlFor="billing-date-input"
@@ -533,6 +544,29 @@ export const IssueInvoicePage = () => {
                   />
                 </div>
               </div>
+              <div className="form-group" style={{ marginTop: '16px' }}>
+                <label
+                  htmlFor="payment-deadline-input"
+                  className="form-label required"
+                >
+                  支払期限
+                </label>
+                <div className="date-input-wrapper">
+                  <input
+                    id="payment-deadline-input"
+                    type="date"
+                    className="form-input"
+                    value={paymentDeadline}
+                    onChange={(e) => setPaymentDeadline(e.target.value)}
+                    required
+                  />
+                  <img
+                    src={calendarIcon}
+                    alt="カレンダー"
+                    className="date-icon"
+                  />
+                </div>
+              </div>
             </div>
             <div className="confirm-modal__actions">
               <button
@@ -546,7 +580,7 @@ export const IssueInvoicePage = () => {
                 type="button"
                 className="btn btn-submit"
                 onClick={handleBillingDateDialogConfirm}
-                disabled={!billingDate}
+                disabled={!billingDate || !paymentDeadline}
               >
                 確定
               </button>

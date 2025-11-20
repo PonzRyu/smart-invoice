@@ -15,6 +15,7 @@ interface InvoiceData {
   companyName: string;
   ttm: number | null;
   billingDate: Date; // 請求日時
+  paymentDeadline: Date; // 支払期限
 }
 
 /**
@@ -55,20 +56,6 @@ function formatDateJapaneseWithZero(
   }
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}年${month}月${day}日`;
-}
-
-/**
- * 請求月の翌月末日を取得
- */
-function getNextMonthEndDate(date: Date): Date {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  // 請求月の翌月 = month + 1
-  // 翌月の0日目 = 前月の最終日
-  const nextMonth = month === 12 ? 1 : month + 1;
-  const nextYear = month === 12 ? year + 1 : year;
-  const lastDay = new Date(nextYear, nextMonth, 0).getDate();
-  return new Date(nextYear, nextMonth - 1, lastDay);
 }
 
 /**
@@ -126,9 +113,10 @@ export async function generateInvoiceExcel(
     shrinkToFit: true,
   };
 
-  // 支払い期限: 請求月の翌月末日
-  const paymentDeadline = getNextMonthEndDate(invoiceData.billingDate);
-  const paymentDeadlineStr = formatDateJapaneseWithZero(paymentDeadline);
+  // 支払期限
+  const paymentDeadlineStr = formatDateJapaneseWithZero(
+    invoiceData.paymentDeadline
+  );
   summarySheet.getCell('F11').value = paymentDeadlineStr;
 
   // 小計
