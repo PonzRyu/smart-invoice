@@ -8,7 +8,7 @@ interface BottomBarProps {
 }
 
 export const BottomBar = ({
-  version = '0.1.1-beta',
+  version = '1.0.0',
   author = 'https://github.com/PonzRyu',
 }: BottomBarProps) => {
   return (
