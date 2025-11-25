@@ -55,6 +55,21 @@ jobs:
           New-Item -ItemType Directory -Path C:\smart-invoice\backend\src\database -Force
           Copy-Item -Path backend\src\database\entities -Destination C:\smart-invoice\backend\src\database\entities -Recurse -Force
           Copy-Item -Path backend\src\database\migrations -Destination C:\smart-invoice\backend\src\database\migrations -Recurse -Force
+          # SSL証明書ディレクトリを作成
+          New-Item -ItemType Directory -Path C:\smart-invoice\backend\ssl -Force
+          # 証明書ファイルをコピー（存在する場合）
+          if (Test-Path "backend\ssl\server.key") {
+            Copy-Item -Path backend\ssl\server.key -Destination C:\smart-invoice\backend\ssl\server.key -Force
+            Write-Host "SSL key file copied"
+          } else {
+            Write-Host "SSL key file not found, HTTPS will not be enabled"
+          }
+          if (Test-Path "backend\ssl\server.crt") {
+            Copy-Item -Path backend\ssl\server.crt -Destination C:\smart-invoice\backend\ssl\server.crt -Force
+            Write-Host "SSL certificate file copied"
+          } else {
+            Write-Host "SSL certificate file not found, HTTPS will not be enabled"
+          }
 
       - name: Install PM2 globally
         run: |

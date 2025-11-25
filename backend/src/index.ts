@@ -3,6 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import { config } from 'dotenv';
 import path from 'path';
+import https from 'https';
+import fs from 'fs';
 import { In } from 'typeorm';
 import { AppDataSource } from './database/data-source';
 import { CustomerInfo } from './database/entities/CustomerInfo';
@@ -14,6 +16,7 @@ config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 
 // Middleware
 app.use(cors());
@@ -676,10 +679,51 @@ AppDataSource.initialize()
   .then(() => {
     console.log('Database connection established successfully');
 
-    // Start server
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-    });
+    // HTTPS設定
+    const sslKeyPath = process.env.SSL_KEY_PATH;
+    const sslCertPath = process.env.SSL_CERT_PATH;
+
+    if (sslKeyPath && sslCertPath) {
+      try {
+        const httpsOptions = {
+          key: fs.readFileSync(sslKeyPath),
+          cert: fs.readFileSync(sslCertPath),
+        };
+
+        // HTTPSサーバーを起動
+        const httpsServer = https.createServer(httpsOptions, app);
+        httpsServer.listen(HTTPS_PORT, () => {
+          console.log(`HTTPS Server is running on port ${HTTPS_PORT}`);
+        });
+
+        // HTTPサーバーも起動してHTTPSにリダイレクト（本番環境のみ）
+        if (process.env.NODE_ENV === 'production') {
+          const httpApp = express();
+          httpApp.use((req, res) => {
+            const host =
+              req.headers.host?.replace(/:\d+$/, '') || req.headers.host;
+            res.redirect(`https://${host}:${HTTPS_PORT}${req.url}`);
+          });
+          httpApp.listen(PORT, () => {
+            console.log(
+              `HTTP Server is running on port ${PORT} (redirecting to HTTPS)`
+            );
+          });
+        }
+      } catch (error) {
+        console.error('Error loading SSL certificates:', error);
+        console.log('Falling back to HTTP server');
+        // 証明書の読み込みに失敗した場合はHTTPで起動
+        app.listen(PORT, () => {
+          console.log(`HTTP Server is running on port ${PORT}`);
+        });
+      }
+    } else {
+      // 証明書のパスが設定されていない場合はHTTPで起動
+      app.listen(PORT, () => {
+        console.log(`HTTP Server is running on port ${PORT}`);
+      });
+    }
   })
   .catch((error: unknown) => {
     console.error('Error during database initialization:', error);
