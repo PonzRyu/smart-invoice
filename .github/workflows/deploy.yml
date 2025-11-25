@@ -28,7 +28,7 @@ jobs:
 
       - name: Install backend dependencies
         working-directory: ./backend
-        run: npm ci --production
+        run: npm ci
 
       - name: Build backend
         working-directory: ./backend
@@ -67,7 +67,7 @@ jobs:
 
       - name: Install backend dependencies in deployment directory
         working-directory: C:\smart-invoice\backend
-        run: npm install --production
+        run: npm install
 
       - name: Restart application with PM2
         working-directory: C:\smart-invoice\backend
