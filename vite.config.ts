@@ -8,6 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: 'auto', // または 'inline'
       includeAssets: ['favicon.png'],
       manifest: {
         name: 'AIMS SaaS INVOICE - 請求書自動生成システム',

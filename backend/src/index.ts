@@ -26,7 +26,21 @@ if (process.env.NODE_ENV === 'production') {
   const distPath = path.join(__dirname, '../../dist');
 
   // 静的ファイル（JS、CSS、画像など）を配信
-  app.use(express.static(distPath));
+  // PWA関連ファイルのMIMEタイプを正しく設定
+  app.use(
+    express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        if (
+          filePath.endsWith('.webmanifest') ||
+          filePath.endsWith('manifest.json')
+        ) {
+          res.setHeader('Content-Type', 'application/manifest+json');
+        } else if (filePath.endsWith('.js') && filePath.includes('sw')) {
+          res.setHeader('Content-Type', 'application/javascript');
+        }
+      },
+    })
+  );
 
   // すべてのルートでindex.htmlを返す（SPA用）
   app.get('*', (req, res, next) => {
