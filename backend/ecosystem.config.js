@@ -9,6 +9,17 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3001,
       },
+      // 本番環境の設定
+      env_production: {
+        NODE_ENV: 'production',
+        PORT: 3001,
+        DB_HOST: 'localhost',
+        DB_PORT: '5432',
+        // 以下の値は.envファイルまたは環境変数で設定してください
+        // DB_USERNAME: 'your_username',
+        // DB_PASSWORD: 'your_password',
+        // DB_DATABASE: 'your_database',
+      },
       // 環境変数ファイルのパス（.envファイルを使用する場合）
       env_file: '.env',
       // ログ設定
