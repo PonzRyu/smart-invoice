@@ -68,7 +68,6 @@ Self-hosted Runnerを登録する際に必要な一時トークンは、以下�
 
 ```powershell
 # ランナー用ディレクトリを作成
-cd C:\
 mkdir actions-runner
 cd actions-runner
 
@@ -101,6 +100,7 @@ npm --version   # 10.8.2であることを確認
 
 ```powershell
 npm install -g pm2
+npm install -g pm2-windows-startup
 ```
 
 ### 4. デプロイディレクトリの作成
@@ -113,11 +113,11 @@ New-Item -ItemType Directory -Path C:\Users\ESL-VM-SERVER1\dev\smart-invoice\bac
 
 ### 5. 環境変数ファイルの作成
 
-`C:\dev\smart-invoice\backend\.env` を作成し、以下を設定：
+`C:\smart-invoice\backend\.env` を作成し、以下を設定：
 
 ```env
-# Database Configuration
-DB_HOST=localhost
+# Database Configuration（本番環境）
+DB_HOST=25.20.10.200
 DB_PORT=5432
 DB_USERNAME=postgres
 DB_PASSWORD=postgres
@@ -128,12 +128,17 @@ PORT=3001
 NODE_ENV=production
 ```
 
+**注意**: `DB_USERNAME`、`DB_PASSWORD`、`DB_DATABASE`は実際の本番環境の値に置き換えてください。
+
 ### 6. 初回手動デプロイ（データベースマイグレーション実行）
 
 ```powershell
 # リポジトリをクローン（初回のみ）
 cd C:\
-git clone https://github.com/your-username/smart-invoice.git smart-invoice-source
+git@github.com:PonzRyu/smart-invoice.git
+または、
+(If no ssh config)git clone https://github.com/your-username/smart-invoice.git smart-invoice-source
+
 
 # フロントエンドをビルド
 cd smart-invoice-source
@@ -146,26 +151,30 @@ npm install --production
 npm run build
 
 # ファイルをデプロイディレクトリにコピー
-Copy-Item -Path ..\dist -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\dist -Recurse -Force
-Copy-Item -Path dist -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\dist -Recurse -Force
-Copy-Item -Path node_modules -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\node_modules -Recurse -Force
-Copy-Item -Path package.json -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\ -Force
-Copy-Item -Path ecosystem.config.js -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\ -Force
-Copy-Item -Path tsconfig.json -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\ -Force
+cd ..
+Copy-Item -Path dist -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\dist -Recurse -Force
+Copy-Item -Path backend\dist -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\dist -Recurse -Force
+Copy-Item -Path backend\node_modules -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\node_modules -Recurse -Force
+Copy-Item -Path backend\package.json -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\ -Force
+Copy-Item -Path backend\ecosystem.config.js -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\ -Force
+Copy-Item -Path backend\tsconfig.json -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\ -Force
 New-Item -ItemType Directory -Path C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\src\database -Force
-Copy-Item -Path src\database\entities -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\src\database\entities -Recurse -Force
-Copy-Item -Path src\database\migrations -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\src\database\migrations -Recurse -Force
+Copy-Item -Path backend\src\database\entities -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\src\database\entities -Recurse -Force
+Copy-Item -Path backend\src\database\migrations -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\src\database\migrations -Recurse -Force
 
 # データベースマイグレーション実行（初回のみ）
 cd C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend
 npm run migration:run
+
+# 実行ポリシーを永続的に変更（管理者権限が必要）
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 # PM2でアプリケーションを起動
 pm2 start ecosystem.config.js
 pm2 save
 
 # Windows起動時に自動起動するように設定
-pm2 startup
+npx pm2-windows-startup install
 # 表示されたコマンドを管理者権限で実行
 ```
 
