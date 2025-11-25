@@ -67,6 +67,15 @@ function getUsageYearMonthDate(issuedDate: string): Date {
 }
 
 /**
+ * 利用年月の月の総日数を取得
+ */
+function getDaysInMonth(issuedDate: string): number {
+  const [year, month] = issuedDate.split('-').map(Number);
+  // 次の月の0日目を取得することで、現在の月の最終日（日数）を取得
+  return new Date(year, month, 0).getDate();
+}
+
+/**
  * Excelファイルを生成してダウンロード
  */
 export async function generateInvoiceExcel(
@@ -123,14 +132,14 @@ export async function generateInvoiceExcel(
   const subtotalCell = summarySheet.getCell('E15');
   subtotalCell.numFmt = `"${currency}"#,##0.00`;
   subtotalCell.value = {
-    formula: `=SUM(店舗別明細!H3:H1048576)`,
+    formula: `=ROUND(SUM(店舗別明細!H3:H1048576), 2)`,
   };
 
   // 消費税(ドル)
   const dollerTaxCell = summarySheet.getCell('J15');
   dollerTaxCell.numFmt = `"${currency}"#,##0.00`;
   dollerTaxCell.value = {
-    formula: `=E15*0.1`,
+    formula: `=ROUND(E15*0.1, 2)`,
   };
 
   // 消費税(円)
@@ -144,7 +153,7 @@ export async function generateInvoiceExcel(
   const totalBillCell = summarySheet.getCell('R15');
   totalBillCell.numFmt = `"$"#,##0.00`;
   totalBillCell.value = {
-    formula: `=SUM(E15, J15)`,
+    formula: `=ROUND(SUM(E15, J15), 2)`,
   };
   summarySheet.getCell('R15').alignment = {
     shrinkToFit: true,
@@ -241,92 +250,115 @@ export async function generateInvoiceExcel(
     const row = startRow + index;
 
     // B列: store_code
-    const cellB = storeSheet.getCell(`B${row}`);
-    cellB.value = summary.store_code;
+    const storeCodeCell = storeSheet.getCell(`B${row}`);
+    storeCodeCell.value = summary.store_code;
+    storeCodeCell.alignment = {
+      horizontal: 'left',
+      vertical: 'middle',
+    };
 
     // C列: store_name
-    const cellC = storeSheet.getCell(`C${row}`);
-    cellC.value = summary.store_name ?? '';
-    cellC.alignment = {
+    const storeNameCell = storeSheet.getCell(`C${row}`);
+    storeNameCell.value = summary.store_name ?? '';
+    storeNameCell.alignment = {
       shrinkToFit: true,
+    };
+    storeNameCell.alignment = {
+      horizontal: 'left',
+      vertical: 'middle',
     };
 
     // D列: usage_days
-    const cellD = storeSheet.getCell(`D${row}`);
-    cellD.numFmt = '#,##0"日"';
-    cellD.value = summary.usage_days;
+    const usageDaysCell = storeSheet.getCell(`D${row}`);
+    usageDaysCell.numFmt = '#,##0"日"';
+    usageDaysCell.value = summary.usage_days;
+    usageDaysCell.alignment = {
+      horizontal: 'right',
+      vertical: 'middle',
+    };
 
     // E列: avg_label_count
-    const cellE = storeSheet.getCell(`E${row}`);
-    cellE.numFmt = '#,##0"枚"';
-    cellE.value = summary.avg_label_count;
-    cellE.alignment = {
+    const avgLabelCountCell = storeSheet.getCell(`E${row}`);
+    avgLabelCountCell.numFmt = '#,##0"枚"';
+    avgLabelCountCell.value = summary.avg_label_count;
+    avgLabelCountCell.alignment = {
       shrinkToFit: true,
+    };
+    avgLabelCountCell.alignment = {
+      horizontal: 'right',
+      vertical: 'middle',
     };
 
     // F列: avg_product_update_count
-    const cellF = storeSheet.getCell(`F${row}`);
-    cellF.numFmt = '#,##0"回"';
-    cellF.value = summary.avg_product_update_count;
-    cellF.alignment = {
+    const avgProductUpdateCountCell = storeSheet.getCell(`F${row}`);
+    avgProductUpdateCountCell.numFmt = '#,##0"回"';
+    avgProductUpdateCountCell.value = summary.avg_product_update_count;
+    avgProductUpdateCountCell.alignment = {
       shrinkToFit: true,
+      horizontal: 'right',
+      vertical: 'middle',
     };
 
-    const cellG = storeSheet.getCell(`G${row}`);
-    cellG.numFmt = '0.00%';
-    cellG.value = {
-      formula: `=IFERROR(店舗別明細!$F${row}/店舗別明細!$E${row},"")`,
+    // G列: update_rate
+    const updateRate = storeSheet.getCell(`G${row}`);
+    updateRate.numFmt = '0.00%';
+    updateRate.value = {
+      formula: `=ROUND(店舗別明細!$F${row}/店舗別明細!$E${row}, 2)`,
     };
-    cellG.alignment = {
+    updateRate.alignment = {
       shrinkToFit: true,
+      horizontal: 'right',
+      vertical: 'middle',
     };
 
-    const cellH = storeSheet.getCell(`H${row}`);
-    cellH.numFmt = `"${currency}"#,##0.00`;
-    cellH.value = {
-      formula: `=IF(店舗別明細!$D${row}=0,"",ROUND(店舗別明細!$E${row}*${unitPrice},3))`,
+    const priceCell = storeSheet.getCell(`H${row}`);
+    priceCell.numFmt = `"${currency}"#,##0.00`;
+    priceCell.value = {
+      formula: `=ROUND(店舗別明細!$E${row}*${unitPrice}*${usageDaysCell.value}/${getDaysInMonth(invoiceData.issuedDate)}, 2)`,
     };
-    cellH.alignment = {
+    priceCell.alignment = {
       shrinkToFit: true,
+      horizontal: 'right',
+      vertical: 'middle',
     };
 
-    cellB.border = {
+    storeCodeCell.border = {
       top: borderStyle,
       left: borderStyle,
       bottom: borderStyle,
       right: borderStyle,
     };
-    cellC.border = {
+    storeNameCell.border = {
       top: borderStyle,
       left: borderStyle,
       bottom: borderStyle,
       right: borderStyle,
     };
-    cellD.border = {
+    usageDaysCell.border = {
       top: borderStyle,
       left: borderStyle,
       bottom: borderStyle,
       right: borderStyle,
     };
-    cellE.border = {
+    avgLabelCountCell.border = {
       top: borderStyle,
       left: borderStyle,
       bottom: borderStyle,
       right: borderStyle,
     };
-    cellF.border = {
+    avgProductUpdateCountCell.border = {
       top: borderStyle,
       left: borderStyle,
       bottom: borderStyle,
       right: borderStyle,
     };
-    cellG.border = {
+    updateRate.border = {
       top: borderStyle,
       left: borderStyle,
       bottom: borderStyle,
       right: borderStyle,
     };
-    cellH.border = {
+    priceCell.border = {
       top: borderStyle,
       left: borderStyle,
       bottom: borderStyle,
@@ -334,10 +366,6 @@ export async function generateInvoiceExcel(
     };
 
     const rowObj = storeSheet.getRow(row);
-    rowObj.alignment = {
-      horizontal: 'right',
-      vertical: 'middle',
-    };
     rowObj.font = { name: '游ゴシック', size: 10 };
   });
 
