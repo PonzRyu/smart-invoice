@@ -436,6 +436,34 @@ app.post('/api/invoices/upload', async (req, res) => {
         }
       }
 
+      // 該当月の該当company_codeのデータをすべて削除
+      const [year, month] = issuedDate.split('-');
+      if (!year || !month) {
+        throw new Error('利用年月の形式が不正です。');
+      }
+
+      // その月の最初の日（YYYY-MM-01）
+      const startDate = new Date(`${year}-${month}-01T00:00:00.000Z`);
+
+      // 次の月の最初の日（YYYY-MM+1-01）
+      const nextMonth = parseInt(month, 10) + 1;
+      const nextYear =
+        nextMonth > 12 ? parseInt(year, 10) + 1 : parseInt(year, 10);
+      const nextMonthStr = (nextMonth > 12 ? 1 : nextMonth)
+        .toString()
+        .padStart(2, '0');
+      const endDate = new Date(`${nextYear}-${nextMonthStr}-01T00:00:00.000Z`);
+
+      // 該当月の該当company_codeのstore_summaryレコードを削除
+      await storeSummaryRepository
+        .createQueryBuilder()
+        .delete()
+        .from(StoreSummary)
+        .where('company_code = :companyCode', { companyCode })
+        .andWhere('date >= :startDate', { startDate })
+        .andWhere('date < :endDate', { endDate })
+        .execute();
+
       const storeSummariesToSave = storeSummariesArray.map((item) => {
         const storeSummary = new StoreSummary();
         storeSummary.company_code = companyCode;
@@ -447,12 +475,9 @@ app.post('/api/invoices/upload', async (req, res) => {
         return storeSummary;
       });
 
+      // 削除後に新しいデータを挿入
       if (storeSummariesToSave.length > 0) {
-        await storeSummaryRepository.upsert(storeSummariesToSave, [
-          'company_code',
-          'store_code',
-          'date',
-        ]);
+        await storeSummaryRepository.save(storeSummariesToSave);
       }
 
       // 同じ月に同じcompany_codeで既存の請求書があるか確認
@@ -466,8 +491,12 @@ app.post('/api/invoices/upload', async (req, res) => {
       let savedIssuedInvoice: IssuedInvoice;
 
       if (existingInvoice) {
-        // 既存の請求書が存在する場合は、そのまま使用
-        savedIssuedInvoice = existingInvoice;
+        // 既存の請求書が存在する場合は、ttm、currency、company_nameを更新
+        existingInvoice.ttm = ttm ?? null;
+        existingInvoice.currency = currency;
+        existingInvoice.company_name = companyName;
+        savedIssuedInvoice =
+          await issuedInvoiceRepository.save(existingInvoice);
       } else {
         // 既存の請求書が存在しない場合は、新しい請求書番号を発行
         const lastInvoice = await issuedInvoiceRepository.findOne({

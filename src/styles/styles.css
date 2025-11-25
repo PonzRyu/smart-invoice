@@ -1095,8 +1095,8 @@
 }
 
 .confirm-modal__icon {
-  width: 72px;
-  height: 72px;
+  width: 120px;
+  height: 120px;
   margin: 24px auto 0 auto;
   border-radius: 50%;
   display: flex;
@@ -1105,13 +1105,13 @@
 }
 
 .confirm-modal__icon img {
-  width: 72px;
-  height: 72px;
+  width: 120px;
+  height: 120px;
   object-fit: contain;
 }
 
 .confirm-modal__body {
-  padding: 20px 28px 18px 28px;
+  padding: 0px 28px 18px 28px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1178,8 +1178,8 @@
 }
 
 .confirm-modal__icon--error img {
-  width: 64px;
-  height: 64px;
+  width: 120px;
+  height: 120px;
 }
 
 .confirm-modal__progress {
@@ -1217,7 +1217,6 @@
   gap: 6px;
   padding: 12px 16px;
   border-radius: 12px;
-  background: rgba(198, 40, 40, 0.12);
 }
 
 .confirm-modal__error-line {
@@ -1753,40 +1752,6 @@
   font-size: 13px;
 }
 
-.issue-invoice-download-button {
-  background: transparent;
-  border: none;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-}
-
-.issue-invoice-download-button:hover:not(:disabled) {
-  opacity: 0.8;
-}
-
-.issue-invoice-download-button:active:not(:disabled) {
-  opacity: 0.6;
-}
-
-.issue-invoice-download-button:disabled {
-  cursor: not-allowed;
-}
-
-.issue-invoice-download-icon {
-  width: 20px;
-  height: 20px;
-  opacity: 1;
-  transition: opacity 0.2s ease;
-}
-
-.issue-invoice-download-button:disabled .issue-invoice-download-icon {
-  opacity: 0.4;
-}
-
 .action-icon-button:active {
   background-color: rgba(47, 0, 109, 0.15);
   transform: scale(0.98);
@@ -1936,4 +1901,35 @@
 
 .cell-select option {
   color: #000000;
+}
+
+/* 日付入力フィールドのカスタムカレンダーアイコン */
+.date-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.date-input-wrapper .form-input[type='date'] {
+  padding-right: 40px;
+  -webkit-appearance: none;
+}
+
+.date-input-wrapper
+  .form-input[type='date']::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  position: absolute;
+  right: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.date-input-wrapper .date-icon {
+  position: absolute;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+  z-index: 1;
 }

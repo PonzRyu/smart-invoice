@@ -7,6 +7,8 @@ import arrowBackIcon from '../styles/raws/list_arrow_back_raw.svg';
 import arrowNextIcon from '../styles/raws/list_arrow_next_raw.svg';
 import arrowDropDownIcon from '../styles/raws/arrow_drop_down_raw.svg';
 import downloadIcon from '../styles/raws/download_raw.svg';
+import questionIcon from '../styles/raws/question_raw.svg';
+import calendarIcon from '../styles/raws/calender_raw.svg';
 import { generateInvoiceExcel } from '../utils/excelGenerator';
 import templateUrl from '../assets/invoice_template.xlsx?url';
 import '../styles/styles.css';
@@ -51,6 +53,12 @@ export const IssueInvoicePage = () => {
   const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<
     number | null
   >(null);
+  const [isBillingDateDialogOpen, setIsBillingDateDialogOpen] = useState(false);
+  const [pendingInvoice, setPendingInvoice] = useState<IssuedInvoice | null>(
+    null
+  );
+  const [billingDate, setBillingDate] = useState<string>('');
+  const [paymentDeadline, setPaymentDeadline] = useState<string>('');
 
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -203,20 +211,52 @@ export const IssueInvoicePage = () => {
     });
   };
 
-  const handleDownloadInvoice = async (invoice: IssuedInvoice) => {
+  const handleDownloadInvoice = (invoice: IssuedInvoice) => {
     if (downloadingInvoiceId !== null) {
       return; // 既にダウンロード処理中
     }
 
-    setDownloadingInvoiceId(invoice.id);
+    // 前月の末日をデフォルト値として設定（請求日時）
+    const today = new Date();
+    const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0); // 前月の末日
+    const year = lastMonth.getFullYear();
+    const month = String(lastMonth.getMonth() + 1).padStart(2, '0');
+    const day = String(lastMonth.getDate()).padStart(2, '0');
+    setBillingDate(`${year}-${month}-${day}`);
+
+    // 翌月の末日をデフォルト値として設定（支払期限）
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 2, 0); // 翌月の末日
+    const nextYear = nextMonth.getFullYear();
+    const nextMonthNum = String(nextMonth.getMonth() + 1).padStart(2, '0');
+    const nextDay = String(nextMonth.getDate()).padStart(2, '0');
+    setPaymentDeadline(`${nextYear}-${nextMonthNum}-${nextDay}`);
+
+    setPendingInvoice(invoice);
+    setIsBillingDateDialogOpen(true);
+  };
+
+  const handleBillingDateDialogCancel = () => {
+    setIsBillingDateDialogOpen(false);
+    setPendingInvoice(null);
+    setBillingDate('');
+    setPaymentDeadline('');
+  };
+
+  const handleBillingDateDialogConfirm = async () => {
+    if (!pendingInvoice || !billingDate || !paymentDeadline) {
+      return;
+    }
+
+    setDownloadingInvoiceId(pendingInvoice.id);
+    setIsBillingDateDialogOpen(false);
     setErrorMessage('');
 
     try {
       // 店舗別明細データを取得
       const storeSummaryResponse = await fetch(
         `http://localhost:3001/api/store-summaries?companyCode=${encodeURIComponent(
-          invoice.company_code
-        )}&issuedDate=${encodeURIComponent(invoice.issued_date)}`
+          pendingInvoice.company_code
+        )}&issuedDate=${encodeURIComponent(pendingInvoice.issued_date)}`
       );
 
       if (!storeSummaryResponse.ok) {
@@ -225,15 +265,20 @@ export const IssueInvoicePage = () => {
 
       const storeSummaries = await storeSummaryResponse.json();
 
+      // 選択された日付をDateオブジェクトに変換
+      const selectedBillingDate = new Date(billingDate);
+      const selectedPaymentDeadline = new Date(paymentDeadline);
+
       // Excelファイルを生成してダウンロード
       await generateInvoiceExcel(
         templateUrl,
         {
-          invoiceCode: invoice.invoice_code,
-          issuedDate: invoice.issued_date,
-          companyName: invoice.company_name,
-          ttm: invoice.ttm,
-          downloadDate: new Date(),
+          invoiceCode: pendingInvoice.invoice_code,
+          issuedDate: pendingInvoice.issued_date,
+          companyName: pendingInvoice.company_name,
+          ttm: pendingInvoice.ttm,
+          billingDate: selectedBillingDate,
+          paymentDeadline: selectedPaymentDeadline,
         },
         storeSummaries,
         selectedCustomer?.unit_price!,
@@ -248,6 +293,9 @@ export const IssueInvoicePage = () => {
       );
     } finally {
       setDownloadingInvoiceId(null);
+      setPendingInvoice(null);
+      setBillingDate('');
+      setPaymentDeadline('');
     }
   };
 
@@ -432,7 +480,7 @@ export const IssueInvoicePage = () => {
                       <div className="customer-list-cell issue-invoice-cell">
                         <button
                           type="button"
-                          className="issue-invoice-download-button"
+                          className="action-icon-button"
                           title="請求書をダウンロード"
                           onClick={() => handleDownloadInvoice(invoice)}
                           disabled={downloadingInvoiceId === invoice.id}
@@ -440,7 +488,7 @@ export const IssueInvoicePage = () => {
                           <img
                             src={downloadIcon}
                             alt="ダウンロード"
-                            className="issue-invoice-download-icon"
+                            className="action-icon"
                           />
                         </button>
                       </div>
@@ -454,6 +502,92 @@ export const IssueInvoicePage = () => {
       <TopBar headline="請求書発行" />
       <NavigationRail />
       <BottomBar />
+
+      {/* 請求日時選択ダイアログ */}
+      {isBillingDateDialogOpen && (
+        <div
+          className="confirm-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              handleBillingDateDialogCancel();
+            }
+          }}
+        >
+          <div className="confirm-modal">
+            <div className="confirm-modal__icon confirm-modal__icon--confirm">
+              <img src={questionIcon} alt="確認" />
+            </div>
+            <div className="confirm-modal__body">
+              <p className="confirm-modal__message">日付を選択してください。</p>
+              <div className="form-group" style={{ marginTop: '16px' }}>
+                <label
+                  htmlFor="billing-date-input"
+                  className="form-label required"
+                >
+                  請求日時
+                </label>
+                <div className="date-input-wrapper">
+                  <input
+                    id="billing-date-input"
+                    type="date"
+                    className="form-input"
+                    value={billingDate}
+                    onChange={(e) => setBillingDate(e.target.value)}
+                    required
+                  />
+                  <img
+                    src={calendarIcon}
+                    alt="カレンダー"
+                    className="date-icon"
+                  />
+                </div>
+              </div>
+              <div className="form-group" style={{ marginTop: '16px' }}>
+                <label
+                  htmlFor="payment-deadline-input"
+                  className="form-label required"
+                >
+                  支払期限
+                </label>
+                <div className="date-input-wrapper">
+                  <input
+                    id="payment-deadline-input"
+                    type="date"
+                    className="form-input"
+                    value={paymentDeadline}
+                    onChange={(e) => setPaymentDeadline(e.target.value)}
+                    required
+                  />
+                  <img
+                    src={calendarIcon}
+                    alt="カレンダー"
+                    className="date-icon"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="confirm-modal__actions">
+              <button
+                type="button"
+                className="btn btn-cancel"
+                onClick={handleBillingDateDialogCancel}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                className="btn btn-submit"
+                onClick={handleBillingDateDialogConfirm}
+                disabled={!billingDate || !paymentDeadline}
+              >
+                確定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
