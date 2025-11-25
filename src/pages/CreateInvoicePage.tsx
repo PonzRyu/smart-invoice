@@ -276,7 +276,9 @@ export const CreateInvoicePage = () => {
       setIsLoadingCustomers(true);
       setCustomerFetchError(null);
       try {
-        const response = await fetch('http://localhost:3001/api/customers');
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || ''}/api/customers`
+        );
         if (!response.ok) {
           throw new Error('顧客情報の取得に失敗しました。');
         }
@@ -482,7 +484,7 @@ export const CreateInvoicePage = () => {
           : null;
 
       const response = await fetch(
-        'http://localhost:3001/api/invoices/upload',
+        `${import.meta.env.VITE_API_URL || ''}/api/invoices/upload`,
         {
           method: 'POST',
           headers: {

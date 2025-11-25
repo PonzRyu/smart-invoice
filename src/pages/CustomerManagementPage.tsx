@@ -61,7 +61,9 @@ export const CustomerManagementPage = () => {
   const fetchCustomers = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:3001/api/customers');
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || ''}/api/customers`
+      );
       if (response.ok) {
         const data = await response.json();
         // unit_priceを確実に数値型に変換
@@ -134,7 +136,7 @@ export const CustomerManagementPage = () => {
 
     try {
       const response = await fetch(
-        `http://localhost:3001/api/customers/${id}`,
+        `${import.meta.env.VITE_API_URL || ''}/api/customers/${id}`,
         {
           method: 'DELETE',
         }
@@ -216,7 +218,7 @@ export const CustomerManagementPage = () => {
       // 編集された顧客の更新
       for (const [id, customer] of editedCustomers) {
         const response = await fetch(
-          `http://localhost:3001/api/customers/${id}`,
+          `${import.meta.env.VITE_API_URL || ''}/api/customers/${id}`,
           {
             method: 'PUT',
             headers: {
@@ -239,18 +241,21 @@ export const CustomerManagementPage = () => {
 
       // 新規顧客の追加
       if (isAdding) {
-        const response = await fetch('http://localhost:3001/api/customers', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            company_name: newCustomer.company_name,
-            company_code: newCustomer.company_code,
-            currency: newCustomer.currency,
-            unit_price: Number(newCustomer.unit_price),
-          }),
-        });
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || ''}/api/customers`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              company_name: newCustomer.company_name,
+              company_code: newCustomer.company_code,
+              currency: newCustomer.currency,
+              unit_price: Number(newCustomer.unit_price),
+            }),
+          }
+        );
 
         if (!response.ok) {
           const errorData = await response.json();

@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import express from 'express';
 import cors from 'cors';
 import { config } from 'dotenv';
+import path from 'path';
 import { In } from 'typeorm';
 import { AppDataSource } from './database/data-source';
 import { CustomerInfo } from './database/entities/CustomerInfo';
@@ -18,6 +19,24 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// 静的ファイルの配信（本番環境のみ）
+if (process.env.NODE_ENV === 'production') {
+  // CommonJS環境では__dirnameが直接使用可能
+  const distPath = path.join(__dirname, '../../dist');
+
+  // 静的ファイル（JS、CSS、画像など）を配信
+  app.use(express.static(distPath));
+
+  // すべてのルートでindex.htmlを返す（SPA用）
+  app.get('*', (req, res, next) => {
+    // APIエンドポイントは除外
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {

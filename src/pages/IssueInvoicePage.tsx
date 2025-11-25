@@ -64,7 +64,9 @@ export const IssueInvoicePage = () => {
     const fetchCustomers = async () => {
       setIsLoadingCustomers(true);
       try {
-        const response = await fetch('http://localhost:3001/api/customers');
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || ''}/api/customers`
+        );
         if (!response.ok) {
           throw new Error('顧客情報の取得に失敗しました。');
         }
@@ -90,7 +92,7 @@ export const IssueInvoicePage = () => {
     setErrorMessage('');
     try {
       const response = await fetch(
-        `http://localhost:3001/api/issued-invoices?companyCode=${encodeURIComponent(
+        `${import.meta.env.VITE_API_URL || ''}/api/issued-invoices?companyCode=${encodeURIComponent(
           companyCode
         )}`
       );
@@ -254,7 +256,7 @@ export const IssueInvoicePage = () => {
     try {
       // 店舗別明細データを取得
       const storeSummaryResponse = await fetch(
-        `http://localhost:3001/api/store-summaries?companyCode=${encodeURIComponent(
+        `${import.meta.env.VITE_API_URL || ''}/api/store-summaries?companyCode=${encodeURIComponent(
           pendingInvoice.company_code
         )}&issuedDate=${encodeURIComponent(pendingInvoice.issued_date)}`
       );

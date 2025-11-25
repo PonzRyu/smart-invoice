@@ -1,0 +1,83 @@
+name: Deploy to Windows Server
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted # 社内Windowsサーバーで実行
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.18.0'
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: npm ci --production
+
+      - name: Build backend
+        working-directory: ./backend
+        run: npm run build
+
+      - name: Create deployment directory
+        run: |
+          New-Item -ItemType Directory -Path C:\smart-invoice -Force
+          New-Item -ItemType Directory -Path C:\smart-invoice\dist -Force
+          New-Item -ItemType Directory -Path C:\smart-invoice\backend -Force
+          New-Item -ItemType Directory -Path C:\smart-invoice\backend\logs -Force
+
+      - name: Copy frontend files
+        run: |
+          Copy-Item -Path dist\* -Destination C:\smart-invoice\dist -Recurse -Force
+
+      - name: Copy backend files
+        run: |
+          Copy-Item -Path backend\dist -Destination C:\smart-invoice\backend\dist -Recurse -Force
+          Copy-Item -Path backend\node_modules -Destination C:\smart-invoice\backend\node_modules -Recurse -Force
+          Copy-Item -Path backend\package.json -Destination C:\smart-invoice\backend\ -Force
+          Copy-Item -Path backend\ecosystem.config.js -Destination C:\smart-invoice\backend\ -Force
+          Copy-Item -Path backend\tsconfig.json -Destination C:\smart-invoice\backend\ -Force
+          New-Item -ItemType Directory -Path C:\smart-invoice\backend\src\database -Force
+          Copy-Item -Path backend\src\database\entities -Destination C:\smart-invoice\backend\src\database\entities -Recurse -Force
+          Copy-Item -Path backend\src\database\migrations -Destination C:\smart-invoice\backend\src\database\migrations -Recurse -Force
+
+      - name: Install PM2 globally
+        run: |
+          if (!(Get-Command pm2 -ErrorAction SilentlyContinue)) {
+            Write-Host "Installing PM2..."
+            npm install -g pm2
+          } else {
+            Write-Host "PM2 is already installed"
+          }
+
+      - name: Install backend dependencies in deployment directory
+        working-directory: C:\smart-invoice\backend
+        run: npm install --production
+
+      - name: Restart application with PM2
+        working-directory: C:\smart-invoice\backend
+        run: |
+          $ErrorActionPreference = "Stop"
+          Write-Host "Stopping existing application if running..."
+          pm2 stop smart-invoice-backend 2>$null
+          pm2 delete smart-invoice-backend 2>$null
+          Write-Host "Starting application..."
+          pm2 start ecosystem.config.js
+          pm2 save
+          Write-Host "Application status:"
+          pm2 status
