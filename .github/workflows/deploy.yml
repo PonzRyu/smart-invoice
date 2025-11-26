@@ -88,7 +88,6 @@ jobs:
         working-directory: C:\smart-invoice\backend
         run: |
           $ErrorActionPreference = "Stop"
-          $env:HOMEPATH = "C:\etc\.pm2"
           Write-Host "Stopping existing application if running..."
           pm2 stop smart-invoice-backend 2>$null
           pm2 delete smart-invoice-backend 2>$null
