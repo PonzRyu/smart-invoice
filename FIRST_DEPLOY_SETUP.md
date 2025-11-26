@@ -49,9 +49,9 @@ npm install -g pm2-windows-startup
 ### 4. デプロイディレクトリの作成
 
 ```powershell
-New-Item -ItemType Directory -Path C:\Users\ESL-VM-SERVER1\dev\smart-invoice -Force
-New-Item -ItemType Directory -Path C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend -Force
-New-Item -ItemType Directory -Path C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\logs -Force
+New-Item -ItemType Directory -Path C:\smart-invoice -Force
+New-Item -ItemType Directory -Path C:\smart-invoice\backend -Force
+New-Item -ItemType Directory -Path C:\smart-invoice\backend\logs -Force
 ```
 
 ### 5. 環境変数ファイルの作成
@@ -95,24 +95,25 @@ npm run build
 
 # ファイルをデプロイディレクトリにコピー
 cd ..
-Copy-Item -Path dist -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\dist -Recurse -Force
-Copy-Item -Path backend\dist -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\dist -Recurse -Force
-Copy-Item -Path backend\node_modules -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\node_modules -Recurse -Force
-Copy-Item -Path backend\package.json -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\ -Force
-Copy-Item -Path backend\ecosystem.config.js -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\ -Force
-Copy-Item -Path backend\tsconfig.json -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\ -Force
-New-Item -ItemType Directory -Path C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\src\database -Force
-Copy-Item -Path backend\src\database\entities -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\src\database\entities -Recurse -Force
-Copy-Item -Path backend\src\database\migrations -Destination C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend\src\database\migrations -Recurse -Force
+Copy-Item -Path dist -Destination C:\smart-invoice\dist -Recurse -Force
+Copy-Item -Path backend\dist -Destination C:\smart-invoice\backend\dist -Recurse -Force
+Copy-Item -Path backend\node_modules -Destination C:\smart-invoice\backend\node_modules -Recurse -Force
+Copy-Item -Path backend\package.json -Destination C:\smart-invoice\backend\ -Force
+Copy-Item -Path backend\ecosystem.config.js -Destination C:\smart-invoice\backend\ -Force
+Copy-Item -Path backend\tsconfig.json -Destination C:\smart-invoice\backend\ -Force
+New-Item -ItemType Directory -Path C:\smart-invoice\backend\src\database -Force
+Copy-Item -Path backend\src\database\entities -Destination C:\smart-invoice\backend\src\database\entities -Recurse -Force
+Copy-Item -Path backend\src\database\migrations -Destination C:\smart-invoice\backend\src\database\migrations -Recurse -Force
 
 # データベースマイグレーション実行（初回のみ）
-cd C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend
+cd C:\smart-invoice\backend
 npm run migration:run
 
 # 実行ポリシーを永続的に変更（管理者権限が必要）
 Set-ExecutionPolicy -Scope LocalMachine RemoteSigned
 
 # PM2でアプリケーションを起動
+cd C:\smart-invoice\backend
 pm2 start ecosystem.config.js
 pm2 save
 
@@ -130,7 +131,7 @@ npx pm2-windows-startup install
 1. コードを`main`ブランチにプッシュ
 2. GitHub Actionsが自動実行
 3. フロントエンドとバックエンドをビルド
-4. ビルド成果物を`C:\Users\ESL-VM-SERVER1\dev\smart-invoice`にコピー
+4. ビルド成果物を`C:\smart-invoice`にコピー
 5. PM2でアプリケーションを再起動
 
 ### 手動でデプロイを実行する場合
@@ -186,7 +187,7 @@ pm2 env 0
 
 ### 静的ファイルが表示されない
 
-- `C:\Users\ESL-VM-SERVER1\dev\smart-invoice\dist`ディレクトリにファイルが存在するか確認
+- `C:\smart-invoice\dist`ディレクトリにファイルが存在するか確認
 - バックエンドのログでエラーがないか確認
 
 ## 注意事項
