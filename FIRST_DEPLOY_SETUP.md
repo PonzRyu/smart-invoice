@@ -109,8 +109,8 @@ Copy-Item -Path backend\src\database\migrations -Destination C:\Users\ESL-VM-SER
 cd C:\Users\ESL-VM-SERVER1\dev\smart-invoice\backend
 npm run migration:run
 
-# pm2の実行ポリシーを永続的に変更（管理者権限が必要）
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+# 実行ポリシーを永続的に変更（管理者権限が必要）
+Set-ExecutionPolicy -Scope LocalMachine RemoteSigned
 
 # PM2でアプリケーションを起動
 pm2 start ecosystem.config.js
