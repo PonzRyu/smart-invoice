@@ -89,11 +89,14 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $env:HOMEPATH = "C:\etc\"
-          Write-Host "Stopping existing application if running..."
-          pm2 stop smart-invoice-backend 2>$null
-          pm2 delete smart-invoice-backend 2>$null
-          Write-Host "Starting application..."
-          pm2 start ecosystem.config.js
-          pm2 save
-          Write-Host "Application status:"
+          # 既に実行中の場合はreload、そうでなければstart
+          $pm2List = pm2 list 2>&1
+          if ($pm2List -like "*smart-invoice-backend*") {
+            Write-Host "Reloading application (zero-downtime)..."
+            pm2 reload smart-invoice-backend 2>&1
+          } else {
+            Write-Host "Starting application..."
+            pm2 start ecosystem.config.js 2>&1
+            pm2 save 2>&1
+          }
           pm2 status
