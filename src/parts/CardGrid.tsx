@@ -39,6 +39,11 @@ export const CardGrid = () => {
       title: '変更履歴',
       path: '/ReleaseNotes',
     },
+    {
+      icon: releaseNoteIcon,
+      title: '変更履歴',
+      path: '/ReleaseNotes',
+    },
   ];
 
   const handleCardClick = (path: string) => {
