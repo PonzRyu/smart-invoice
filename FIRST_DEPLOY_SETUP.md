@@ -43,7 +43,7 @@ npm --version   # 10.8.2であることを確認
 
 ```powershell
 npm install -g pm2
-npm install -g pm2-windows-startup
+npm install -g pm2-windows-service
 ```
 
 ### 4. デプロイディレクトリの作成
@@ -118,7 +118,7 @@ pm2 start ecosystem.config.js
 pm2 save
 
 # Windows起動時に自動起動するように設定
-npx pm2-windows-startup install
+pm2-service-install
 # 表示されたコマンドを管理者権限で実行
 ```
 
