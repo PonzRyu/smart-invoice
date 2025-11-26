@@ -19,8 +19,10 @@ module.exports = {
         HTTPS_PORT: 3443,
         DB_HOST: 'localhost',
         DB_PORT: '5432',
-        SSL_KEY_PATH: 'C:\\smart-invoice\\backend\\ssl\\server.key',
-        SSL_CERT_PATH: 'C:\\smart-invoice\\backend\\ssl\\server.crt',
+        SSL_KEY_PATH:
+          'C:\\Users\\Solum-DT\\dev\\smart-invoice\\backend\\ssl\\server.key',
+        SSL_CERT_PATH:
+          'C:\\Users\\Solum-DT\\dev\\smart-invoice\\backend\\ssl\\server.crt',
         // 以下の値は.envファイルまたは環境変数で設定してください
         // DB_USERNAME: 'your_username',
         // DB_PASSWORD: 'your_password',
