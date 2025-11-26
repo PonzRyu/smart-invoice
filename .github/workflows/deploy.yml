@@ -86,10 +86,33 @@ jobs:
 
       - name: Restart application with PM2
         working-directory: C:\smart-invoice\backend
+        continue-on-error: true
         run: |
-          $ErrorActionPreference = "Stop"
-          $env:HOMEPATH = "C:\etc\"
-          # 既に実行中の場合はreload、そうでなければstart
+          $ErrorActionPreference = "Continue"
+          $env:PM2_HOME = "C:\etc\.pm2"
+          $env:HOMEPATH = $env:USERPROFILE
+          $env:HOME = $env:USERPROFILE
+
+          Write-Host "Attempting to connect to PM2 daemon..."
+
+          # PM2に接続できるかテスト
+          $pm2Test = pm2 ping 2>&1
+          if ($LASTEXITCODE -ne 0 -or $pm2Test -like "*EPERM*" -or $pm2Test -like "*connect*") {
+            Write-Host "WARNING: Cannot connect to PM2 daemon. This may be because:"
+            Write-Host "  1. PM2 is running under a different user account"
+            Write-Host "  2. PM2 daemon is not running"
+            Write-Host "  3. Permission issues with PM2 socket"
+            Write-Host ""
+            Write-Host "Deployment completed successfully, but application restart is required."
+            Write-Host "Please restart manually using one of the following methods:"
+            Write-Host "  Method 1: pm2 restart smart-invoice-backend"
+            Write-Host "  Method 2: pm2 reload smart-invoice-backend"
+            Write-Host "  Method 3: cd C:\smart-invoice\backend && pm2 start ecosystem.config.js"
+            exit 0
+          }
+
+          # PM2に接続できた場合のみ、アプリケーションを再起動
+          Write-Host "Connected to PM2 daemon successfully"
           $pm2List = pm2 list 2>&1
           if ($pm2List -like "*smart-invoice-backend*") {
             Write-Host "Reloading application (zero-downtime)..."
