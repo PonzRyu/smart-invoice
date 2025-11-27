@@ -1,6 +1,10 @@
 import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
 import path from 'path';
+import { CustomerInfo } from './entities/CustomerInfo';
+import { IssuedInvoice } from './entities/IssuedInvoice';
+import { StoreSummary } from './entities/StoreSummary';
+import { StoreMaster } from './entities/StoreMaster';
 
 config();
 
@@ -17,7 +21,8 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_DATABASE || 'postgres',
   synchronize: false,
   logging: true,
-  entities: [path.join(__dirname, 'entities', fileExtension)],
+  // エンティティクラスを直接指定（最も確実な方法）
+  entities: [CustomerInfo, IssuedInvoice, StoreSummary, StoreMaster],
   migrations: [path.join(__dirname, 'migrations', fileExtension)],
   subscribers: [path.join(__dirname, 'subscribers', fileExtension)],
 });
