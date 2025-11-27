@@ -55,12 +55,35 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
+// データベース接続チェック用ミドルウェア
+const checkDatabaseConnection = (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  if (!AppDataSource.isInitialized) {
+    console.error('Database connection is not initialized');
+    return res.status(503).json({
+      error: 'Database connection is not available',
+      message: 'サービスを開始中です。しばらくお待ちください。',
+    });
+  }
+  next();
+};
+
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Smart Invoice Backend API is running' });
+  const dbStatus = AppDataSource.isInitialized ? 'connected' : 'disconnected';
+  res.json({
+    status: 'ok',
+    message: 'Smart Invoice Backend API is running',
+    database: dbStatus,
+  });
 });
 
 // 顧客管理APIエンドポイント
+// すべてのAPIエンドポイントにデータベース接続チェックを適用
+app.use('/api', checkDatabaseConnection);
 
 // 全顧客取得（ASC順）
 app.get('/api/customers', async (req, res) => {
@@ -74,7 +97,12 @@ app.get('/api/customers', async (req, res) => {
     res.json(customers);
   } catch (error) {
     console.error('Error fetching customers:', error);
-    res.status(500).json({ error: 'Failed to fetch customers' });
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({
+      error: 'Failed to fetch customers',
+      details: process.env.NODE_ENV === 'production' ? undefined : errorMessage,
+    });
   }
 });
 
