@@ -1,8 +1,8 @@
 # Windows起動時にIISアプリケーションプールを自動起動するスクリプト
 # このスクリプトは管理者権限で実行する必要があります
 
-$appPoolName = "SmartInvoiceAppPool"
-$taskName = "StartSmartInvoiceAppPool"
+$appPoolName = "AimsSaaSInvoiceAppPool"
+$taskName = "StartAimsSaaSInvoiceAppPool"
 
 Write-Host "Setting up auto-start for IIS Application Pool: $appPoolName"
 

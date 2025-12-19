@@ -75,7 +75,7 @@ if ($cert) {
 管理者権限でPowerShellを開き、以下のコマンドを実行：
 
 ```powershell
-cd C:\path\to\smart-invoice
+cd C:\smart-invoice
 .\scripts\setup-auto-start.ps1
 ```
 
