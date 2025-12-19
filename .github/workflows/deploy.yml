@@ -37,7 +37,7 @@ jobs:
             Stop-WebAppPool -Name $appPoolName
             Start-Sleep -Seconds 2
           }
-        shell: pwsh
+        shell: powershell
 
       - name: Backup current deployment
         run: |
@@ -47,7 +47,7 @@ jobs:
             Copy-Item -Path $deployPath -Destination $backupPath -Recurse -Force
             Write-Host "Backup created at: $backupPath"
           }
-        shell: pwsh
+        shell: powershell
 
       - name: Deploy to IIS
         run: |
@@ -71,7 +71,7 @@ jobs:
           }
 
           Write-Host "Deployment completed to: $deployPath"
-        shell: pwsh
+        shell: powershell
 
       - name: Configure IIS Site and Application Pool
         run: |
@@ -148,7 +148,7 @@ jobs:
           }
 
           Write-Host "IIS configuration completed"
-        shell: pwsh
+        shell: powershell
 
       - name: Start IIS Application Pool
         run: |
@@ -162,7 +162,7 @@ jobs:
             exit 1
           }
           Write-Host "Application pool started successfully"
-        shell: pwsh
+        shell: powershell
 
       - name: Verify deployment
         run: |
@@ -174,4 +174,4 @@ jobs:
           }
           Write-Host "Website state: $($site.State)"
           Write-Host "Deployment verification completed"
-        shell: pwsh
+        shell: powershell
