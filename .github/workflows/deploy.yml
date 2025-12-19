@@ -1,0 +1,177 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - feature/create-auto-deploy-system
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.18.0'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Stop IIS Application Pool (if running)
+        run: |
+          $appPoolName = "AimsSaaSInvoiceAppPool"
+          $siteName = "AimsSaaSInvoice"
+          Import-Module WebAdministration
+          if (Get-WebAppPoolState -Name $appPoolName -ErrorAction SilentlyContinue) {
+            Stop-WebAppPool -Name $appPoolName
+            Start-Sleep -Seconds 2
+          }
+        shell: pwsh
+
+      - name: Backup current deployment
+        run: |
+          $deployPath = "C:\inetpub\wwwroot\smart-invoice"
+          $backupPath = "C:\inetpub\wwwroot\smart-invoice-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+          if (Test-Path $deployPath) {
+            Copy-Item -Path $deployPath -Destination $backupPath -Recurse -Force
+            Write-Host "Backup created at: $backupPath"
+          }
+        shell: pwsh
+
+      - name: Deploy to IIS
+        run: |
+          $deployPath = "C:\inetpub\wwwroot\smart-invoice"
+          $distPath = "${{ github.workspace }}\dist"
+
+          # デプロイ先ディレクトリが存在しない場合は作成
+          if (-not (Test-Path $deployPath)) {
+            New-Item -ItemType Directory -Path $deployPath -Force
+          }
+
+          # 既存ファイルを削除（.gitkeepなどは保持）
+          Get-ChildItem -Path $deployPath -Exclude "web.config" | Remove-Item -Recurse -Force
+
+          # ビルド成果物をコピー
+          Copy-Item -Path "$distPath\*" -Destination $deployPath -Recurse -Force
+
+          # web.configが存在しない場合はコピー
+          if (-not (Test-Path "$deployPath\web.config")) {
+            Copy-Item -Path "${{ github.workspace }}\web.config" -Destination "$deployPath\web.config" -Force
+          }
+
+          Write-Host "Deployment completed to: $deployPath"
+        shell: pwsh
+
+      - name: Configure IIS Site and Application Pool
+        run: |
+          $appPoolName = "AimsSaaSInvoiceAppPool"
+          $siteName = "AimsSaaSInvoice"
+          $deployPath = "C:\inetpub\wwwroot\smart-invoice"
+          $port = 443
+          $hostName = "25.20.10.200"
+
+          Import-Module WebAdministration
+
+          # アプリケーションプールの作成または設定
+          if (-not (Get-WebAppPoolState -Name $appPoolName -ErrorAction SilentlyContinue)) {
+            New-WebAppPool -Name $appPoolName
+            Write-Host "Application pool created: $appPoolName"
+          }
+
+          # アプリケーションプールの設定
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name managedRuntimeVersion -Value ""
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name startMode -Value "AlwaysRunning"
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name processModel.idleTimeout -Value ([TimeSpan]::Zero)
+
+          # サイトの作成または設定
+          if (-not (Get-Website -Name $siteName -ErrorAction SilentlyContinue)) {
+            New-Website -Name $siteName -PhysicalPath $deployPath -Port $port -ApplicationPool $appPoolName
+            Write-Host "Website created: $siteName"
+          } else {
+            Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name physicalPath -Value $deployPath
+            Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name applicationPool -Value $appPoolName
+          }
+
+          # HTTPSバインディングの設定
+          $binding = Get-WebBinding -Name $siteName -Protocol https -ErrorAction SilentlyContinue
+          if (-not $binding) {
+            # HTTPSバインディングを作成
+            New-WebBinding -Name $siteName -Protocol https -Port $port -SslFlags 0
+            Write-Host "HTTPS binding created for port $port"
+            
+            # 証明書の検索と設定（複数の方法を試行）
+            $cert = $null
+            
+            # 方法1: ホスト名で検索
+            $cert = Get-ChildItem -Path Cert:\LocalMachine\My | Where-Object { 
+              $_.Subject -like "*$hostName*" -or $_.DnsNameList -like "*$hostName*"
+            } | Select-Object -First 1
+            
+            # 方法2: ワイルドカード証明書を検索
+            if (-not $cert) {
+              $cert = Get-ChildItem -Path Cert:\LocalMachine\My | Where-Object { 
+                $_.Subject -like "*.*" -and $_.HasPrivateKey
+              } | Select-Object -First 1
+            }
+            
+            # 方法3: 有効な証明書を検索
+            if (-not $cert) {
+              $cert = Get-ChildItem -Path Cert:\LocalMachine\My | Where-Object { 
+                $_.NotAfter -gt (Get-Date) -and $_.HasPrivateKey
+              } | Select-Object -First 1
+            }
+            
+            if ($cert) {
+              try {
+                (Get-WebBinding -Name $siteName -Protocol https).AddSslCertificate($cert.Thumbprint, "My")
+                Write-Host "SSL certificate configured: $($cert.Subject)"
+              } catch {
+                Write-Warning "Failed to configure SSL certificate automatically. Please configure it manually in IIS Manager."
+                Write-Warning "Certificate thumbprint: $($cert.Thumbprint)"
+              }
+            } else {
+              Write-Warning "No suitable SSL certificate found. Please configure SSL certificate manually in IIS Manager."
+            }
+          } else {
+            Write-Host "HTTPS binding already exists"
+          }
+
+          Write-Host "IIS configuration completed"
+        shell: pwsh
+
+      - name: Start IIS Application Pool
+        run: |
+          $appPoolName = "AimsSaaSInvoiceAppPool"
+          Import-Module WebAdministration
+          Start-WebAppPool -Name $appPoolName
+          Start-Sleep -Seconds 2
+          $state = (Get-WebAppPoolState -Name $appPoolName).Value
+          if ($state -ne "Started") {
+            Write-Error "Failed to start application pool. Current state: $state"
+            exit 1
+          }
+          Write-Host "Application pool started successfully"
+        shell: pwsh
+
+      - name: Verify deployment
+        run: |
+          $siteName = "AimsSaaSInvoice"
+          Import-Module WebAdministration
+          $site = Get-Website -Name $siteName
+          if ($site.State -ne "Started") {
+            Start-Website -Name $siteName
+          }
+          Write-Host "Website state: $($site.State)"
+          Write-Host "Deployment verification completed"
+        shell: pwsh
