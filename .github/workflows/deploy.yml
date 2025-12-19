@@ -78,7 +78,7 @@ jobs:
           $appPoolName = "AimsSaaSInvoiceAppPool"
           $siteName = "AimsSaaSInvoice"
           $deployPath = "C:\inetpub\wwwroot\smart-invoice"
-          $port = 443
+          $port = 3000
           $hostName = "25.20.10.200"
 
           Import-Module WebAdministration
