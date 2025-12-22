@@ -111,6 +111,9 @@ jobs:
             exit 1
           }
 
+          # エラーが発生しても続行できるように設定（証明書設定はオプショナル）
+          $ErrorActionPreference = "Continue"
+
           try {
             # アプリケーションプールの作成または確認
             $poolExists = & $appcmd list apppool "$appPoolName" 2>&1
@@ -149,48 +152,80 @@ jobs:
             }
 
             # HTTPSバインディングの確認と作成
-            $httpsBinding = & $appcmd list site "$siteName" /config /xml | Select-String -Pattern "binding.*https.*$port" 2>&1
+            $httpsBindingCheck = & $appcmd list site "$siteName" /config /xml 2>&1
+            $httpsBinding = $httpsBindingCheck | Select-String -Pattern "binding.*https.*$port" -ErrorAction SilentlyContinue
+            
             if (-not $httpsBinding) {
               Write-Host "Creating HTTPS binding for port $port"
-              & $appcmd set site "$siteName" /+bindings.[protocol='https',bindingInformation="*:${port}:"] 2>&1 | Out-Null
+              $bindingResult = & $appcmd set site "$siteName" /+bindings.[protocol='https',bindingInformation="*:${port}:"] 2>&1
+              $bindingExitCode = $LASTEXITCODE
               
-              if ($LASTEXITCODE -eq 0) {
+              if ($bindingExitCode -eq 0) {
                 Write-Host "HTTPS binding created for port $port"
-                
-                # 証明書の検索と設定（PowerShellを使用）
+              } else {
+                Write-Warning "Failed to create HTTPS binding (Exit code: $bindingExitCode)"
+                Write-Warning "Output: $bindingResult"
+                # HTTPSバインディングの作成に失敗しても続行（HTTPのみでも動作する）
+              }
+              
+              # 証明書の検索と設定（PowerShellを使用）
+              # 証明書設定は失敗してもワークフローを続行する（オプショナル）
+              Write-Host "Attempting to configure SSL certificate (optional)..."
+              $sslConfigSuccess = $false
+              
+              try {
+                # WebAdministrationモジュールのインポートを試行（失敗しても続行）
+                $moduleLoaded = $false
                 try {
-                  Import-Module WebAdministration -ErrorAction SilentlyContinue
-                  
-                  $cert = $null
-                  # 方法1: ホスト名で検索
-                  $cert = Get-ChildItem -Path Cert:\LocalMachine\My -ErrorAction SilentlyContinue | Where-Object { 
-                    $_.Subject -like "*$hostName*" -or ($_.DnsNameList -and $_.DnsNameList.Unicode -like "*$hostName*")
-                  } | Select-Object -First 1
-                  
-                  # 方法2: 有効な証明書を検索
-                  if (-not $cert) {
-                    $cert = Get-ChildItem -Path Cert:\LocalMachine\My -ErrorAction SilentlyContinue | Where-Object { 
-                      $_.NotAfter -gt (Get-Date) -and $_.HasPrivateKey
-                    } | Select-Object -First 1
-                  }
-                  
-                  if ($cert) {
-                    try {
-                      $binding = Get-WebBinding -Name $siteName -Protocol https -HostHeader "" -Port $port -ErrorAction SilentlyContinue
-                      if ($binding) {
-                        $binding.AddSslCertificate($cert.Thumbprint, "My")
-                        Write-Host "SSL certificate configured: $($cert.Subject)"
-                      }
-                    } catch {
-                      Write-Warning "Failed to configure SSL certificate automatically. Please configure it manually in IIS Manager."
-                      Write-Warning "Certificate thumbprint: $($cert.Thumbprint)"
-                    }
-                  } else {
-                    Write-Warning "No suitable SSL certificate found. Please configure SSL certificate manually in IIS Manager."
-                  }
+                  Import-Module WebAdministration -ErrorAction Stop
+                  $moduleLoaded = $true
                 } catch {
-                  Write-Warning "Could not configure SSL certificate automatically. Please configure it manually in IIS Manager."
+                  Write-Warning "Could not import WebAdministration module. SSL certificate configuration will be skipped."
+                  Write-Warning "Error: $_"
                 }
+                
+                if ($moduleLoaded) {
+                  try {
+                    $cert = $null
+                    # 方法1: ホスト名で検索
+                    $cert = Get-ChildItem -Path Cert:\LocalMachine\My -ErrorAction SilentlyContinue | Where-Object { 
+                      $_.Subject -like "*$hostName*" -or ($_.DnsNameList -and $_.DnsNameList.Unicode -like "*$hostName*")
+                    } | Select-Object -First 1
+                    
+                    # 方法2: 有効な証明書を検索
+                    if (-not $cert) {
+                      $cert = Get-ChildItem -Path Cert:\LocalMachine\My -ErrorAction SilentlyContinue | Where-Object { 
+                        $_.NotAfter -gt (Get-Date) -and $_.HasPrivateKey
+                      } | Select-Object -First 1
+                    }
+                    
+                    if ($cert) {
+                      try {
+                        $binding = Get-WebBinding -Name $siteName -Protocol https -HostHeader "" -Port $port -ErrorAction Stop
+                        if ($binding) {
+                          $binding.AddSslCertificate($cert.Thumbprint, "My")
+                          Write-Host "SSL certificate configured: $($cert.Subject)"
+                          $sslConfigSuccess = $true
+                        }
+                      } catch {
+                        Write-Warning "HTTPS binding not found or could not configure SSL certificate."
+                        Write-Warning "Error: $_"
+                        Write-Warning "Certificate thumbprint: $($cert.Thumbprint)"
+                      }
+                    } else {
+                      Write-Warning "No suitable SSL certificate found."
+                    }
+                  } catch {
+                    Write-Warning "Error while searching for SSL certificate: $_"
+                  }
+                }
+              } catch {
+                Write-Warning "SSL certificate configuration failed: $_"
+              }
+              
+              if (-not $sslConfigSuccess) {
+                Write-Warning "SSL certificate was not configured automatically."
+                Write-Warning "Please configure SSL certificate manually in IIS Manager if HTTPS is required."
               }
             } else {
               Write-Host "HTTPS binding already exists"
@@ -199,6 +234,8 @@ jobs:
             Write-Host "IIS configuration completed"
           } catch {
             Write-Error "Failed to configure IIS: $_"
+            Write-Error "Error details: $($_.Exception.Message)"
+            Write-Error "Stack trace: $($_.ScriptStackTrace)"
             exit 1
           }
         shell: powershell
