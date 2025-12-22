@@ -32,10 +32,34 @@ jobs:
         run: |
           $appPoolName = "AimsSaaSInvoiceAppPool"
           $siteName = "AimsSaaSInvoice"
-          Import-Module WebAdministration
-          if (Get-WebAppPoolState -Name $appPoolName -ErrorAction SilentlyContinue) {
-            Stop-WebAppPool -Name $appPoolName
-            Start-Sleep -Seconds 2
+
+          # 管理者権限のチェック
+          $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+          if (-not $isAdmin) {
+            Write-Warning "Not running as administrator. This may cause permission issues with IIS operations."
+          }
+
+          try {
+            Import-Module WebAdministration -ErrorAction Stop
+            
+            # IIS設定へのアクセス権限を確認
+            $testPath = "IIS:\AppPools"
+            if (-not (Test-Path $testPath)) {
+              throw "Cannot access IIS configuration. The runner service may need to be configured to run as SYSTEM account. Please run: .\scripts\setup-runner-service.ps1 as Administrator"
+            }
+            
+            if (Get-WebAppPoolState -Name $appPoolName -ErrorAction SilentlyContinue) {
+              Stop-WebAppPool -Name $appPoolName
+              Start-Sleep -Seconds 2
+              Write-Host "Application pool stopped: $appPoolName"
+            } else {
+              Write-Host "Application pool not found or already stopped: $appPoolName"
+            }
+          } catch {
+            Write-Error "Failed to stop IIS Application Pool: $_"
+            Write-Error "This usually indicates insufficient permissions."
+            Write-Error "Please ensure the runner service is running as SYSTEM account by executing: .\scripts\setup-runner-service.ps1 as Administrator"
+            exit 1
           }
         shell: powershell
 
@@ -81,97 +105,137 @@ jobs:
           $port = 3000
           $hostName = "25.20.10.200"
 
-          Import-Module WebAdministration
-
-          # アプリケーションプールの作成または設定
-          if (-not (Get-WebAppPoolState -Name $appPoolName -ErrorAction SilentlyContinue)) {
-            New-WebAppPool -Name $appPoolName
-            Write-Host "Application pool created: $appPoolName"
-          }
-
-          # アプリケーションプールの設定
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name managedRuntimeVersion -Value ""
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name startMode -Value "AlwaysRunning"
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name processModel.idleTimeout -Value ([TimeSpan]::Zero)
-
-          # サイトの作成または設定
-          if (-not (Get-Website -Name $siteName -ErrorAction SilentlyContinue)) {
-            New-Website -Name $siteName -PhysicalPath $deployPath -Port $port -ApplicationPool $appPoolName
-            Write-Host "Website created: $siteName"
-          } else {
-            Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name physicalPath -Value $deployPath
-            Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name applicationPool -Value $appPoolName
-          }
-
-          # HTTPSバインディングの設定
-          $binding = Get-WebBinding -Name $siteName -Protocol https -ErrorAction SilentlyContinue
-          if (-not $binding) {
-            # HTTPSバインディングを作成
-            New-WebBinding -Name $siteName -Protocol https -Port $port -SslFlags 0
-            Write-Host "HTTPS binding created for port $port"
+          try {
+            Import-Module WebAdministration -ErrorAction Stop
             
-            # 証明書の検索と設定（複数の方法を試行）
-            $cert = $null
-            
-            # 方法1: ホスト名で検索
-            $cert = Get-ChildItem -Path Cert:\LocalMachine\My | Where-Object { 
-              $_.Subject -like "*$hostName*" -or $_.DnsNameList -like "*$hostName*"
-            } | Select-Object -First 1
-            
-            # 方法2: ワイルドカード証明書を検索
-            if (-not $cert) {
-              $cert = Get-ChildItem -Path Cert:\LocalMachine\My | Where-Object { 
-                $_.Subject -like "*.*" -and $_.HasPrivateKey
-              } | Select-Object -First 1
+            # IIS設定へのアクセス権限を確認
+            $testPath = "IIS:\AppPools"
+            if (-not (Test-Path $testPath)) {
+              throw "Cannot access IIS configuration. The runner service may need to be configured to run as SYSTEM account. Please run: .\scripts\setup-runner-service.ps1 as Administrator"
             }
-            
-            # 方法3: 有効な証明書を検索
-            if (-not $cert) {
-              $cert = Get-ChildItem -Path Cert:\LocalMachine\My | Where-Object { 
-                $_.NotAfter -gt (Get-Date) -and $_.HasPrivateKey
-              } | Select-Object -First 1
+
+            # アプリケーションプールの作成または設定
+            if (-not (Get-WebAppPoolState -Name $appPoolName -ErrorAction SilentlyContinue)) {
+              New-WebAppPool -Name $appPoolName
+              Write-Host "Application pool created: $appPoolName"
             }
-            
-            if ($cert) {
-              try {
-                (Get-WebBinding -Name $siteName -Protocol https).AddSslCertificate($cert.Thumbprint, "My")
-                Write-Host "SSL certificate configured: $($cert.Subject)"
-              } catch {
-                Write-Warning "Failed to configure SSL certificate automatically. Please configure it manually in IIS Manager."
-                Write-Warning "Certificate thumbprint: $($cert.Thumbprint)"
+
+            # アプリケーションプールの設定
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name managedRuntimeVersion -Value ""
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name startMode -Value "AlwaysRunning"
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name processModel.idleTimeout -Value ([TimeSpan]::Zero)
+
+            # サイトの作成または設定
+            if (-not (Get-Website -Name $siteName -ErrorAction SilentlyContinue)) {
+              New-Website -Name $siteName -PhysicalPath $deployPath -Port $port -ApplicationPool $appPoolName
+              Write-Host "Website created: $siteName"
+            } else {
+              Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name physicalPath -Value $deployPath
+              Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name applicationPool -Value $appPoolName
+            }
+
+            # HTTPSバインディングの設定
+            $binding = Get-WebBinding -Name $siteName -Protocol https -ErrorAction SilentlyContinue
+            if (-not $binding) {
+              # HTTPSバインディングを作成
+              New-WebBinding -Name $siteName -Protocol https -Port $port -SslFlags 0
+              Write-Host "HTTPS binding created for port $port"
+              
+              # 証明書の検索と設定（複数の方法を試行）
+              $cert = $null
+              
+              # 方法1: ホスト名で検索
+              $cert = Get-ChildItem -Path Cert:\LocalMachine\My | Where-Object { 
+                $_.Subject -like "*$hostName*" -or $_.DnsNameList -like "*$hostName*"
+              } | Select-Object -First 1
+              
+              # 方法2: ワイルドカード証明書を検索
+              if (-not $cert) {
+                $cert = Get-ChildItem -Path Cert:\LocalMachine\My | Where-Object { 
+                  $_.Subject -like "*.*" -and $_.HasPrivateKey
+                } | Select-Object -First 1
+              }
+              
+              # 方法3: 有効な証明書を検索
+              if (-not $cert) {
+                $cert = Get-ChildItem -Path Cert:\LocalMachine\My | Where-Object { 
+                  $_.NotAfter -gt (Get-Date) -and $_.HasPrivateKey
+                } | Select-Object -First 1
+              }
+              
+              if ($cert) {
+                try {
+                  (Get-WebBinding -Name $siteName -Protocol https).AddSslCertificate($cert.Thumbprint, "My")
+                  Write-Host "SSL certificate configured: $($cert.Subject)"
+                } catch {
+                  Write-Warning "Failed to configure SSL certificate automatically. Please configure it manually in IIS Manager."
+                  Write-Warning "Certificate thumbprint: $($cert.Thumbprint)"
+                }
+              } else {
+                Write-Warning "No suitable SSL certificate found. Please configure SSL certificate manually in IIS Manager."
               }
             } else {
-              Write-Warning "No suitable SSL certificate found. Please configure SSL certificate manually in IIS Manager."
+              Write-Host "HTTPS binding already exists"
             }
-          } else {
-            Write-Host "HTTPS binding already exists"
-          }
 
-          Write-Host "IIS configuration completed"
+            Write-Host "IIS configuration completed"
+          } catch {
+            Write-Error "Failed to configure IIS: $_"
+            Write-Error "Please ensure the runner service is running as SYSTEM account by executing: .\scripts\setup-runner-service.ps1 as Administrator"
+            exit 1
+          }
         shell: powershell
 
       - name: Start IIS Application Pool
         run: |
           $appPoolName = "AimsSaaSInvoiceAppPool"
-          Import-Module WebAdministration
-          Start-WebAppPool -Name $appPoolName
-          Start-Sleep -Seconds 2
-          $state = (Get-WebAppPoolState -Name $appPoolName).Value
-          if ($state -ne "Started") {
-            Write-Error "Failed to start application pool. Current state: $state"
+
+          try {
+            Import-Module WebAdministration -ErrorAction Stop
+            
+            # IIS設定へのアクセス権限を確認
+            $testPath = "IIS:\AppPools"
+            if (-not (Test-Path $testPath)) {
+              throw "Cannot access IIS configuration. The runner service may need to be configured to run as SYSTEM account. Please run: .\scripts\setup-runner-service.ps1 as Administrator"
+            }
+            
+            Start-WebAppPool -Name $appPoolName
+            Start-Sleep -Seconds 2
+            $state = (Get-WebAppPoolState -Name $appPoolName).Value
+            if ($state -ne "Started") {
+              Write-Error "Failed to start application pool. Current state: $state"
+              exit 1
+            }
+            Write-Host "Application pool started successfully"
+          } catch {
+            Write-Error "Failed to start IIS Application Pool: $_"
+            Write-Error "Please ensure the runner service is running as SYSTEM account by executing: .\scripts\setup-runner-service.ps1 as Administrator"
             exit 1
           }
-          Write-Host "Application pool started successfully"
         shell: powershell
 
       - name: Verify deployment
         run: |
           $siteName = "AimsSaaSInvoice"
-          Import-Module WebAdministration
-          $site = Get-Website -Name $siteName
-          if ($site.State -ne "Started") {
-            Start-Website -Name $siteName
+
+          try {
+            Import-Module WebAdministration -ErrorAction Stop
+            
+            # IIS設定へのアクセス権限を確認
+            $testPath = "IIS:\Sites"
+            if (-not (Test-Path $testPath)) {
+              throw "Cannot access IIS configuration. The runner service may need to be configured to run as SYSTEM account. Please run: .\scripts\setup-runner-service.ps1 as Administrator"
+            }
+            
+            $site = Get-Website -Name $siteName
+            if ($site.State -ne "Started") {
+              Start-Website -Name $siteName
+            }
+            Write-Host "Website state: $($site.State)"
+            Write-Host "Deployment verification completed"
+          } catch {
+            Write-Error "Failed to verify deployment: $_"
+            Write-Error "Please ensure the runner service is running as SYSTEM account by executing: .\scripts\setup-runner-service.ps1 as Administrator"
+            exit 1
           }
-          Write-Host "Website state: $($site.State)"
-          Write-Host "Deployment verification completed"
         shell: powershell
