@@ -40,6 +40,11 @@ export const NavigationRail = () => {
       title: '変更履歴',
       path: '/ReleaseNotes',
     },
+    {
+      icon: releaseNoteIcon,
+      title: 'テスト',
+      path: '/ReleaseNotes',
+    },
   ];
 
   const handleHomeClick = () => {
