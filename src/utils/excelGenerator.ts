@@ -13,6 +13,7 @@ interface InvoiceData {
   invoiceCode: number;
   issuedDate: string; // YYYY-MM形式
   companyName: string;
+  siPartnerName: string; // 請求元
   ttm: number | null;
   billingDate: Date; // 請求日時
   paymentDeadline: Date; // 支払期限
@@ -112,6 +113,9 @@ export async function generateInvoiceExcel(
 
   // 請求日時
   const BillingDateStr = formatDateJapanese(invoiceData.billingDate);
+
+  // 請求元
+  summarySheet.getCell('B5').value = invoiceData.siPartnerName;
 
   // 請求書件名: ${issued_invoice.company_name}様向けAIMS SaaS${MM}月度ご利用料金
   const usageDate = getUsageYearMonthDate(invoiceData.issuedDate);
