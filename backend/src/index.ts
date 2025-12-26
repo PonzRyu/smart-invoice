@@ -12,10 +12,18 @@ import { StoreMaster } from './database/entities/StoreMaster';
 config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '3001', 10);
+const HOST = process.env.HOST || '0.0.0.0'; // すべてのインターフェースでリッスン
 
 // Middleware
-app.use(cors());
+// CORS設定：すべてのオリジンを許可（本番環境では適切なオリジンを指定することを推奨）
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -644,8 +652,9 @@ AppDataSource.initialize()
     console.log('Database connection established successfully');
 
     // Start server
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
+    app.listen(PORT, HOST, () => {
+      console.log(`Server is running on http://${HOST}:${PORT}`);
+      console.log(`Health check endpoint: http://${HOST}:${PORT}/health`);
     });
   })
   .catch((error: unknown) => {
