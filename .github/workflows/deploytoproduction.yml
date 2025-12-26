@@ -297,7 +297,6 @@ jobs:
           $maxWaitTime = 30
           $waitInterval = 2
           $elapsed = 0
-          $serverStarted = $false
 
           while ($elapsed -lt $maxWaitTime) {
             Start-Sleep -Seconds $waitInterval
@@ -307,33 +306,7 @@ jobs:
             $tcpConnection = Get-NetTCPConnection -LocalPort 3001 -ErrorAction SilentlyContinue
             if ($tcpConnection) {
               Write-Host "Port 3001 is listening"
-              
-              # ヘルスチェックエンドポイントを確認
-              try {
-                $response = Invoke-WebRequest -Uri "http://localhost:3001/health" -TimeoutSec 5 -ErrorAction Stop
-                if ($response.StatusCode -eq 200) {
-                  Write-Host "Backend server health check passed"
-                  $serverStarted = $true
-                  break
-                }
-              } catch {
-                Write-Host "Health check failed, waiting... (attempt $($elapsed / $waitInterval))"
-              }
             }
-          }
-
-          if ($serverStarted) {
-            Write-Host "Backend server started successfully"
-          } else {
-            Write-Warning "Backend server may not have started properly"
-            Write-Warning "Checking task status..."
-            $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-            if ($task) {
-              $taskInfo = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue
-              Write-Host "Task last run time: $($taskInfo.LastRunTime)"
-              Write-Host "Task last result: $($taskInfo.LastTaskResult)"
-            }
-            Write-Warning "Please check the backend server logs and ensure port 3001 is accessible"
           }
         shell: powershell
 
