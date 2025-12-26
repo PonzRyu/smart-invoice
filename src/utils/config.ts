@@ -7,13 +7,18 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_BACKEND_URL ||
-  'http://localhost:3001';
+  ''; // デフォルトを空文字（相対パス）に変更
 
 // 相対パスでも動作するようにする（本番環境で同じドメインで提供する場合）
 export const getApiUrl = (path: string): string => {
   // パスがすでに完全なURLの場合はそのまま返す
   if (path.startsWith('http://') || path.startsWith('https://')) {
     return path;
+  }
+
+  // ベースURLが空の場合は相対パスとして返す
+  if (!API_BASE_URL) {
+    return path.startsWith('/') ? path : `/${path}`;
   }
 
   // パスが相対パスの場合はベースURLと結合

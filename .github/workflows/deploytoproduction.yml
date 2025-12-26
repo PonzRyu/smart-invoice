@@ -35,11 +35,11 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
-          # バックエンドAPIのURLを設定（本番環境のURLに変更してください）
+          # バックエンドAPIのURLを設定
+          # 空文字（相対パス）にすることで、IISリバースプロキシ経由で/apiにアクセス
+          # 異なるドメインで提供する場合は絶対URLを指定
           # 例: VITE_API_BASE_URL: https://api.example.com
-          # または、同じドメインで提供する場合は相対パス
-          # VITE_API_BASE_URL: /api
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'http://25.20.10.200:3001' }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || '' }}
 
       - name: Stop IIS Application Pool (if running)
         run: |
