@@ -17,6 +17,7 @@ interface Customer {
   id: number;
   company_name: string;
   company_code: string;
+  si_partner_name: string;
   currency: string;
   unit_price: number;
 }
@@ -276,6 +277,7 @@ export const IssueInvoicePage = () => {
           invoiceCode: pendingInvoice.invoice_code,
           issuedDate: pendingInvoice.issued_date,
           companyName: pendingInvoice.company_name,
+          siPartnerName: selectedCustomer?.si_partner_name ?? '',
           ttm: pendingInvoice.ttm,
           billingDate: selectedBillingDate,
           paymentDeadline: selectedPaymentDeadline,
