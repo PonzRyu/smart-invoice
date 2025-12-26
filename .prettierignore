@@ -1,0 +1,24 @@
+# Dependencies
+node_modules
+
+# Build outputs
+dist
+dist-ssr
+build
+*.local
+
+# Logs
+*.log
+
+# Config files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Generated files
+coverage
+.nyc_output
+
+# Misc
+.DS_Store
+*.pem
