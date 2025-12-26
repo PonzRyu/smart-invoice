@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { TopBar } from '../parts/TopBar';
 import { NavigationRail } from '../parts/NavigationRail';
 import { BottomBar } from '../parts/BottomBar';
+import { API_ENDPOINTS } from '../utils/config';
 import arrowBackIcon from '../styles/raws/list_arrow_back_raw.svg';
 import arrowNextIcon from '../styles/raws/list_arrow_next_raw.svg';
 import arrowDropDownIcon from '../styles/raws/arrow_drop_down_raw.svg';
@@ -64,7 +65,7 @@ export const IssueInvoicePage = () => {
     const fetchCustomers = async () => {
       setIsLoadingCustomers(true);
       try {
-        const response = await fetch('http://localhost:3001/api/customers');
+        const response = await fetch(API_ENDPOINTS.customers());
         if (!response.ok) {
           throw new Error('顧客情報の取得に失敗しました。');
         }
@@ -90,9 +91,7 @@ export const IssueInvoicePage = () => {
     setErrorMessage('');
     try {
       const response = await fetch(
-        `http://localhost:3001/api/issued-invoices?companyCode=${encodeURIComponent(
-          companyCode
-        )}`
+        API_ENDPOINTS.issuedInvoices(companyCode)
       );
 
       if (!response.ok) {
@@ -253,11 +252,8 @@ export const IssueInvoicePage = () => {
 
     try {
       // 店舗別明細データを取得
-      const storeSummaryResponse = await fetch(
-        `http://localhost:3001/api/store-summaries?companyCode=${encodeURIComponent(
-          pendingInvoice.company_code
-        )}&issuedDate=${encodeURIComponent(pendingInvoice.issued_date)}`
-      );
+      const storeSummaryUrl = `${API_ENDPOINTS.storeSummaries(pendingInvoice.company_code)}&issuedDate=${encodeURIComponent(pendingInvoice.issued_date)}`;
+      const storeSummaryResponse = await fetch(storeSummaryUrl);
 
       if (!storeSummaryResponse.ok) {
         throw new Error('店舗別明細データの取得に失敗しました。');

@@ -20,13 +20,26 @@ jobs:
           node-version: '20.18.0'
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install dependencies (frontend)
         run: npm ci
 
-      - name: Build application
+      - name: Install dependencies (backend)
+        working-directory: backend
+        run: npm ci
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Build application (frontend)
         run: npm run build
         env:
           NODE_ENV: production
+          # バックエンドAPIのURLを設定（本番環境のURLに変更してください）
+          # 例: VITE_API_BASE_URL: https://api.example.com
+          # または、同じドメインで提供する場合は相対パス
+          # VITE_API_BASE_URL: /api
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'http://25.20.10.200:3001' }}
 
       - name: Stop IIS Application Pool (if running)
         run: |
@@ -95,6 +108,197 @@ jobs:
           }
 
           Write-Host "Deployment completed to: $deployPath"
+        shell: powershell
+
+      - name: Stop backend server (if running)
+        run: |
+          # タスクスケジューラのタスクを停止
+          $taskName = "SmartInvoiceBackendServer"
+          $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+          if ($existingTask) {
+            Write-Host "Stopping scheduled task: $taskName"
+            Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+          }
+
+          # ポート3001を使用しているプロセスを停止
+          $processes = Get-NetTCPConnection -LocalPort 3001 -ErrorAction SilentlyContinue | 
+            Select-Object -ExpandProperty OwningProcess -Unique
+
+          if ($processes) {
+            foreach ($pid in $processes) {
+              $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+              if ($proc -and $proc.ProcessName -eq "node") {
+                Write-Host "Stopping Node.js process on port 3001 (PID: $pid)"
+                Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 2
+              }
+            }
+          }
+
+          Write-Host "Backend server stopped (if it was running)"
+        shell: powershell
+
+      - name: Backup current backend deployment
+        run: |
+          $backendDeployPath = "C:\apps\smart-invoice-backend"
+          $backendBackupPath = "C:\apps\smart-invoice-backend-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+          if (Test-Path $backendDeployPath) {
+            Copy-Item -Path $backendDeployPath -Destination $backendBackupPath -Recurse -Force
+            Write-Host "Backend backup created at: $backendBackupPath"
+          }
+        shell: powershell
+
+      - name: Deploy backend
+        run: |
+          $backendDeployPath = "C:\apps\smart-invoice-backend"
+          $backendSourcePath = "${{ github.workspace }}\backend"
+
+          # デプロイ先ディレクトリが存在しない場合は作成
+          if (-not (Test-Path $backendDeployPath)) {
+            New-Item -ItemType Directory -Path $backendDeployPath -Force | Out-Null
+          }
+
+          # distディレクトリとnode_modulesをコピー
+          $distPath = "$backendSourcePath\dist"
+          if (Test-Path $distPath) {
+            # distディレクトリの内容をコピー
+            if (Test-Path "$backendDeployPath\dist") {
+              Remove-Item -Path "$backendDeployPath\dist" -Recurse -Force
+            }
+            Copy-Item -Path "$distPath" -Destination "$backendDeployPath\dist" -Recurse -Force
+          }
+
+          # package.jsonとpackage-lock.jsonをコピー
+          Copy-Item -Path "$backendSourcePath\package.json" -Destination "$backendDeployPath\package.json" -Force
+          Copy-Item -Path "$backendSourcePath\package-lock.json" -Destination "$backendDeployPath\package-lock.json" -Force
+
+          # node_modulesをコピー（または再インストール）
+          Write-Host "Installing backend dependencies in deployment directory..."
+          Set-Location $backendDeployPath
+          npm ci --production
+
+          Write-Host "Backend deployment completed to: $backendDeployPath"
+        shell: powershell
+
+      - name: Create backend .env file
+        run: |
+          $backendDeployPath = "C:\apps\smart-invoice-backend"
+          $envFilePath = "$backendDeployPath\.env"
+
+          # .envファイルの内容を作成（GitHub Secretsから取得）
+          $dbHost = "${{ secrets.DB_HOST }}"
+          $dbPort = "${{ secrets.DB_PORT }}"
+          $dbUsername = "${{ secrets.DB_USERNAME }}"
+          $dbPassword = "${{ secrets.DB_PASSWORD }}"
+          $dbDatabase = "${{ secrets.DB_DATABASE }}"
+          $backendPort = "${{ secrets.BACKEND_PORT }}"
+
+          # デフォルト値を設定
+          if ([string]::IsNullOrEmpty($dbHost)) { $dbHost = "25.20.10.200" }
+          if ([string]::IsNullOrEmpty($dbPort)) { $dbPort = "5432" }
+          if ([string]::IsNullOrEmpty($dbUsername)) { $dbUsername = "postgres" }
+          if ([string]::IsNullOrEmpty($dbPassword)) { $dbPassword = "postgres" }
+          if ([string]::IsNullOrEmpty($dbDatabase)) { $dbDatabase = "postgres" }
+          if ([string]::IsNullOrEmpty($backendPort)) { $backendPort = "3001" }
+
+          # .envファイルの内容を作成
+          $envLines = @(
+            "DB_HOST=$dbHost",
+            "DB_PORT=$dbPort",
+            "DB_USERNAME=$dbUsername",
+            "DB_PASSWORD=$dbPassword",
+            "DB_DATABASE=$dbDatabase",
+            "PORT=$backendPort",
+            "NODE_ENV=production"
+          )
+
+          $envLines | Out-File -FilePath $envFilePath -Encoding utf8 -Force
+          Write-Host "Backend .env file created at: $envFilePath"
+        shell: powershell
+
+      - name: Run database migrations
+        run: |
+          $backendDeployPath = "C:\apps\smart-invoice-backend"
+
+          Write-Host "Running database migrations..."
+          Set-Location $backendDeployPath
+
+          # 環境変数を設定
+          $env:NODE_ENV = "production"
+
+          # 本番環境用のマイグレーションを実行（JavaScriptファイルを使用）
+          Write-Host "Executing database migrations using production build..."
+          npm run migration:run:production
+
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Database migrations completed successfully"
+          } else {
+            Write-Error "Database migration failed with exit code: $LASTEXITCODE"
+            exit 1
+          }
+        shell: powershell
+
+      - name: Setup backend server scheduled task
+        run: |
+          $backendDeployPath = "C:\apps\smart-invoice-backend"
+          $taskName = "SmartInvoiceBackendServer"
+
+          # 既存のタスクが存在する場合は削除
+          $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+          if ($existingTask) {
+            Write-Host "Removing existing scheduled task: $taskName"
+            Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+          }
+
+          # Node.jsのパスを取得
+          $nodePath = (Get-Command node -ErrorAction Stop).Source
+          Write-Host "Node.js path: $nodePath"
+
+          # タスクスケジューラにタスクを作成
+          $action = New-ScheduledTaskAction -Execute $nodePath `
+            -Argument "`"$backendDeployPath\dist\index.js`"" `
+            -WorkingDirectory $backendDeployPath
+
+          $trigger = New-ScheduledTaskTrigger -AtStartup
+
+          $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" `
+            -LogonType ServiceAccount `
+            -RunLevel Highest
+
+          $settings = New-ScheduledTaskSettingsSet `
+            -AllowStartIfOnBatteries `
+            -DontStopIfGoingOnBatteries `
+            -StartWhenAvailable `
+            -RestartCount 3 `
+            -RestartInterval (New-TimeSpan -Minutes 1)
+
+          Register-ScheduledTask `
+            -TaskName $taskName `
+            -Action $action `
+            -Trigger $trigger `
+            -Principal $principal `
+            -Settings $settings `
+            -Description "Smart Invoice Backend API Server"
+
+          Write-Host "Scheduled task created successfully: $taskName"
+        shell: powershell
+
+      - name: Start backend server
+        run: |
+          $taskName = "SmartInvoiceBackendServer"
+
+          Write-Host "Starting backend server via scheduled task: $taskName"
+          Start-ScheduledTask -TaskName $taskName
+          Start-Sleep -Seconds 5
+
+          # サーバーが起動したか確認（ポート3001をチェック）
+          $tcpConnection = Get-NetTCPConnection -LocalPort 3001 -ErrorAction SilentlyContinue
+          if ($tcpConnection) {
+            Write-Host "Backend server started successfully (port 3001 is listening)"
+          } else {
+            Write-Warning "Backend server may not have started. Please check the logs."
+          }
         shell: powershell
 
       - name: Configure IIS Site and Application Pool

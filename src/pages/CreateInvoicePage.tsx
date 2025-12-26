@@ -4,6 +4,7 @@ import Papa from 'papaparse/papaparse.js';
 import { TopBar } from '../parts/TopBar';
 import { NavigationRail } from '../parts/NavigationRail';
 import { BottomBar } from '../parts/BottomBar';
+import { API_ENDPOINTS } from '../utils/config';
 import fileCsvIcon from '../styles/raws/file_csv_raw.svg';
 import linkIcon from '../styles/raws/link_raw.svg';
 import questionIcon from '../styles/raws/question_raw.svg';
@@ -276,7 +277,7 @@ export const CreateInvoicePage = () => {
       setIsLoadingCustomers(true);
       setCustomerFetchError(null);
       try {
-        const response = await fetch('http://localhost:3001/api/customers');
+        const response = await fetch(API_ENDPOINTS.customers());
         if (!response.ok) {
           throw new Error('顧客情報の取得に失敗しました。');
         }
@@ -482,7 +483,7 @@ export const CreateInvoicePage = () => {
           : null;
 
       const response = await fetch(
-        'http://localhost:3001/api/invoices/upload',
+        API_ENDPOINTS.invoices.upload(),
         {
           method: 'POST',
           headers: {

@@ -54,6 +54,27 @@ cd backend
 npm i
 ```
 
+### 7.5. 環境変数の設定（フロントエンド）
+
+プロジェクトルートに `.env` ファイルを作成し、バックエンドAPIのURLを設定します：
+
+```env
+# 開発環境用
+VITE_API_BASE_URL=http://localhost:3001
+```
+
+または、環境変数を直接指定：
+
+```bash
+# Windows (PowerShell)
+$env:VITE_API_BASE_URL="http://localhost:3001"
+
+# Linux/Mac
+export VITE_API_BASE_URL=http://localhost:3001
+```
+
+環境変数が設定されていない場合、デフォルトで `http://localhost:3001` が使用されます。
+
 ### 8. machine と開発用 DB の起動
 
 ```bash

@@ -19,6 +19,11 @@
 - URL Rewriteモジュールがインストールされていること
 - HTTPS証明書が設定されていること（本番環境用）
 
+### バックエンドAPIサーバー
+
+- バックエンドAPIサーバーが起動していること
+- フロントエンドからアクセス可能なURLを設定すること（環境変数で指定）
+
 ## 初回セットアップ
 
 ### 1. GitHub Actions Runnerの設定
@@ -240,6 +245,28 @@ cd C:\smart-invoice
 
 これにより、Windows起動時に自動的にIISアプリケーションプールが起動するようになります。
 
+## 環境変数の設定
+
+### フロントエンドの環境変数
+
+本番環境でバックエンドAPIのURLを設定するには、GitHub ActionsのSecretsまたは環境変数を使用します。
+
+#### GitHub Actions Secretsの設定
+
+1. GitHubリポジトリの「Settings」→「Secrets and variables」→「Actions」に移動
+2. 「New repository secret」をクリック
+3. 以下のシークレットを追加：
+   - Name: `VITE_API_BASE_URL`
+   - Value: バックエンドAPIのURL（例: `https://api.example.com` または `/api`）
+
+#### 環境変数の設定方法
+
+- **絶対URL**: `https://api.example.com` - 別ドメインのバックエンドAPI
+- **相対パス**: `/api` - 同じドメインで提供する場合（プロキシ設定が必要）
+- **未設定時**: `http://localhost:3001` がデフォルト値として使用されます
+
+**注意**: Viteでは環境変数に`VITE_`プレフィックスが必要です。
+
 ## 自動デプロイ
 
 ### GitHub Actionsによる自動デプロイ
@@ -248,7 +275,7 @@ cd C:\smart-invoice
 
 1. コードのチェックアウト
 2. 依存関係のインストール
-3. アプリケーションのビルド
+3. アプリケーションのビルド（環境変数`VITE_API_BASE_URL`を使用）
 4. 既存デプロイのバックアップ
 5. IISへのデプロイ
 6. IISサイトとアプリケーションプールの設定
