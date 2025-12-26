@@ -157,15 +157,36 @@ jobs:
             
             if (-not $httpsBinding) {
               Write-Host "Creating HTTPS binding for port $port"
-              $bindingResult = & $appcmd set site "$siteName" /+bindings.[protocol='https',bindingInformation="*:${port}:"] 2>&1
-              $bindingExitCode = $LASTEXITCODE
               
-              if ($bindingExitCode -eq 0) {
-                Write-Host "HTTPS binding created for port $port"
-              } else {
-                Write-Warning "Failed to create HTTPS binding (Exit code: $bindingExitCode)"
-                Write-Warning "Output: $bindingResult"
-                # HTTPSバインディングの作成に失敗しても続行（HTTPのみでも動作する）
+              # WebAdministrationモジュールを優先的に使用
+              $bindingCreated = $false
+              try {
+                Import-Module WebAdministration -ErrorAction Stop
+                New-WebBinding -Name $siteName -Protocol https -Port $port -SslFlags 0 -ErrorAction Stop
+                Write-Host "HTTPS binding created using WebAdministration module"
+                $bindingCreated = $true
+              } catch {
+                Write-Host "WebAdministration module not available, trying appcmd..."
+                
+                # appcmdを使用（フォールバック）
+                # バインディング情報を変数に構築して、適切にクォートで囲む
+                $bindingInfo = "*:${port}:"
+                $bindingArg = "/+bindings.[protocol='https',bindingInformation='$bindingInfo']"
+                $bindingResult = & $appcmd set site "$siteName" $bindingArg 2>&1
+                $bindingExitCode = $LASTEXITCODE
+                
+                if ($bindingExitCode -eq 0) {
+                  Write-Host "HTTPS binding created using appcmd"
+                  $bindingCreated = $true
+                } else {
+                  Write-Warning "Failed to create HTTPS binding (Exit code: $bindingExitCode)"
+                  Write-Warning "Output: $bindingResult"
+                  # HTTPSバインディングの作成に失敗しても続行（HTTPのみでも動作する）
+                }
+              }
+              
+              if (-not $bindingCreated) {
+                Write-Warning "HTTPS binding creation failed, but continuing with HTTP only"
               }
               
               # 証明書の検索と設定（PowerShellを使用）
