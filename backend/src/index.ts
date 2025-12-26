@@ -228,7 +228,7 @@ app.post('/api/invoices/upload', async (req, res) => {
 
   if (summaries.length === 0) {
     return res.status(400).json({
-      error: '元データにレコードが存在しません。',
+      error: 'お客様利用データにレコードが存在しません。',
     });
   }
 
@@ -262,7 +262,7 @@ app.post('/api/invoices/upload', async (req, res) => {
   if (missingHeaders.length > 0) {
     return res.status(400).json({
       error: [
-        '元データが不正です。元データの中身をご確認ください。',
+        'お客様利用データが不正です。お客様利用データの中身をご確認ください。',
         `${missingHeaders.join(', ')}データが存在しません。`,
       ],
     });
@@ -273,8 +273,8 @@ app.post('/api/invoices/upload', async (req, res) => {
   if (uniqueCompanies.size !== 1) {
     return res.status(400).json({
       error: [
-        '元データが不正です。元データの中身をご確認ください。',
-        '元データに複数の顧客(Company)が含まれています。元データは必ず1つの顧客を指定して出力してください。',
+        'お客様利用データが不正です。お客様利用データの中身をご確認ください。',
+        'お客様利用データに複数の顧客(Company)が含まれています。お客様利用データは必ず1つの顧客を指定して出力してください。',
       ],
     });
   }
@@ -284,9 +284,9 @@ app.post('/api/invoices/upload', async (req, res) => {
   if (csvCompany !== companyCode) {
     return res.status(400).json({
       error: [
-        '利用顧客名と元データの顧客名が一致しないです。元データの中身をご確認ください。',
+        '利用顧客名とお客様利用データの顧客名が一致しないです。お客様利用データの中身をご確認ください。',
         `利用顧客名:${companyCode}`,
-        `元データー：${csvCompany}`,
+        `お客様利用データー：${csvCompany}`,
       ],
     });
   }
@@ -335,7 +335,7 @@ app.post('/api/invoices/upload', async (req, res) => {
       return res.status(400).json({
         error: [
           '利用年月が正しくありません。',
-          '元データの中身を確認して正しい利用年月を指定してください。',
+          'お客様利用データの中身を確認して正しい利用年月を指定してください。',
         ],
       });
     }
