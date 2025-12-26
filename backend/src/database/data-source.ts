@@ -4,6 +4,10 @@ import path from 'path';
 
 config();
 
+// 本番環境では.js、開発環境では.tsを使用
+const isProduction = process.env.NODE_ENV === 'production';
+const fileExtension = isProduction ? 'js' : 'ts';
+
 export const AppDataSource = new DataSource({
   type: 'postgres',
   host: process.env.DB_HOST || 'localhost',
@@ -13,7 +17,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_DATABASE || 'postgres',
   synchronize: false,
   logging: true,
-  entities: [path.join(__dirname, 'entities', '*.ts')],
-  migrations: [path.join(__dirname, 'migrations', '*.ts')],
-  subscribers: [path.join(__dirname, 'subscribers', '*.ts')],
+  entities: [path.join(__dirname, 'entities', `*.${fileExtension}`)],
+  migrations: [path.join(__dirname, 'migrations', `*.${fileExtension}`)],
+  subscribers: [path.join(__dirname, 'subscribers', `*.${fileExtension}`)],
 });

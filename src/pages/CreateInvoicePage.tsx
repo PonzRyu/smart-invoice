@@ -4,6 +4,7 @@ import Papa from 'papaparse/papaparse.js';
 import { TopBar } from '../parts/TopBar';
 import { NavigationRail } from '../parts/NavigationRail';
 import { BottomBar } from '../parts/BottomBar';
+import { API_ENDPOINTS } from '../utils/config';
 import fileCsvIcon from '../styles/raws/file_csv_raw.svg';
 import linkIcon from '../styles/raws/link_raw.svg';
 import questionIcon from '../styles/raws/question_raw.svg';
@@ -99,7 +100,7 @@ const validateAndTransformCsv = (
   if (missingHeaders.length > 0) {
     return {
       errorMessages: [
-        '元データが不正です。元データの中身をご確認ください。',
+        'お客様利用データが不正です。お客様利用データの中身をご確認ください。',
         `${missingHeaders.join(', ')}データが存在しません。`,
       ],
     };
@@ -130,7 +131,7 @@ const validateAndTransformCsv = (
     if (dayRaw === '' || companyRaw === '' || storeRaw === '') {
       return {
         errorMessages: [
-          '元データが不正です。元データの中身をご確認ください。',
+          'お客様利用データが不正です。お客様利用データの中身をご確認ください。',
           'Day, Company, Storeのいずれかが欠損している行があります。',
         ],
       };
@@ -140,7 +141,7 @@ const validateAndTransformCsv = (
     if (normalizedDay.length < 10) {
       return {
         errorMessages: [
-          '元データが不正です。元データの中身をご確認ください。',
+          'お客様利用データが不正です。お客様利用データの中身をご確認ください。',
           'Dayの形式が不正な行があります。',
         ],
       };
@@ -151,7 +152,7 @@ const validateAndTransformCsv = (
       return {
         errorMessages: [
           '利用年月が正しくありません。',
-          '元データの中身を確認して正しい利用年月を指定してください。',
+          'お客様利用データの中身を確認して正しい利用年月を指定してください。',
         ],
       };
     }
@@ -162,7 +163,7 @@ const validateAndTransformCsv = (
     if (Number.isNaN(totalLabels) || Number.isNaN(productUpdated)) {
       return {
         errorMessages: [
-          '元データが不正です。元データの中身をご確認ください。',
+          'お客様利用データが不正です。お客様利用データの中身をご確認ください。',
           'Total LabelsまたはProduct Updatedに数値以外の値が含まれています。',
         ],
       };
@@ -183,15 +184,15 @@ const validateAndTransformCsv = (
 
   if (records.length === 0) {
     return {
-      errorMessages: ['元データに有効なレコードが存在しません。'],
+      errorMessages: ['お客様利用データに有効なレコードが存在しません。'],
     };
   }
 
   if (companies.size !== 1) {
     return {
       errorMessages: [
-        '元データが不正です。元データの中身をご確認ください。',
-        '元データに複数の顧客(Company)が含まれています。元データは必ず1つの顧客を指定して出力してください。',
+        'お客様利用データが不正です。お客様利用データの中身をご確認ください。',
+        'お客様利用データに複数の顧客(Company)が含まれています。お客様利用データは必ず1つの顧客を指定して出力してください。',
       ],
     };
   }
@@ -201,10 +202,10 @@ const validateAndTransformCsv = (
   if (csvCompany !== selectedCompanyCode) {
     return {
       errorMessages: [
-        '利用顧客名と元データの顧客名が一致しないです。',
-        '元データの中身をご確認ください。',
+        '利用顧客名とお客様利用データの顧客名が一致しないです。',
+        'お客様利用データの中身をご確認ください。',
         `利用顧客名：${selectedCompanyCode}`,
-        `元データー：${csvCompany}`,
+        `お客様利用データー：${csvCompany}`,
       ],
     };
   }
@@ -276,7 +277,7 @@ export const CreateInvoicePage = () => {
       setIsLoadingCustomers(true);
       setCustomerFetchError(null);
       try {
-        const response = await fetch('http://localhost:3001/api/customers');
+        const response = await fetch(API_ENDPOINTS.customers());
         if (!response.ok) {
           throw new Error('顧客情報の取得に失敗しました。');
         }
@@ -482,7 +483,7 @@ export const CreateInvoicePage = () => {
           : null;
 
       const response = await fetch(
-        'http://localhost:3001/api/invoices/upload',
+        API_ENDPOINTS.invoices.upload(),
         {
           method: 'POST',
           headers: {
@@ -694,10 +695,10 @@ export const CreateInvoicePage = () => {
             )}
           </div>
 
-          {/* 元データをアップロード */}
+          {/* お客様利用データをアップロード */}
           <div className="form-group">
             <label className="form-label required">
-              元データをアップロード
+              お客様利用データをアップロード
             </label>
             <div
               className={`file-upload-area ${isDragOver ? 'drag-over' : ''} ${
@@ -809,7 +810,7 @@ export const CreateInvoicePage = () => {
                         </li>
                       )}
                       <li className="confirm-modal__summary-item">
-                        <span className="summary-label">元データ</span>
+                        <span className="summary-label">お客様利用データ</span>
                         <span className="summary-value summary-value--file">
                           {uploadedFile?.name || '未選択'}
                         </span>
@@ -845,7 +846,7 @@ export const CreateInvoicePage = () => {
                 {modalMode === 'success' && (
                   <div className="confirm-modal__success">
                     <p className="confirm-modal__success-message">
-                      元データーのアップロードが成功しました。
+                      お客様利用データーのアップロードが成功しました。
                       <br />
                       請求書発行ページに移動しますか？
                     </p>

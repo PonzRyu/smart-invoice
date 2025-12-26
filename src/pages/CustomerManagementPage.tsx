@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { TopBar } from '../parts/TopBar';
 import { NavigationRail } from '../parts/NavigationRail';
 import { BottomBar } from '../parts/BottomBar';
+import { API_ENDPOINTS } from '../utils/config';
 import modifyIcon from '../styles/raws/modify_raw.svg';
 import deleteIcon from '../styles/raws/delete_raw.svg';
 import searchIcon from '../styles/raws/search_raw.svg';
@@ -61,7 +62,7 @@ export const CustomerManagementPage = () => {
   const fetchCustomers = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:3001/api/customers');
+      const response = await fetch(API_ENDPOINTS.customers());
       if (response.ok) {
         const data = await response.json();
         // unit_priceを確実に数値型に変換
@@ -134,7 +135,7 @@ export const CustomerManagementPage = () => {
 
     try {
       const response = await fetch(
-        `http://localhost:3001/api/customers/${id}`,
+        API_ENDPOINTS.customer(id),
         {
           method: 'DELETE',
         }
@@ -216,7 +217,7 @@ export const CustomerManagementPage = () => {
       // 編集された顧客の更新
       for (const [id, customer] of editedCustomers) {
         const response = await fetch(
-          `http://localhost:3001/api/customers/${id}`,
+          API_ENDPOINTS.customer(id),
           {
             method: 'PUT',
             headers: {
@@ -239,7 +240,7 @@ export const CustomerManagementPage = () => {
 
       // 新規顧客の追加
       if (isAdding) {
-        const response = await fetch('http://localhost:3001/api/customers', {
+        const response = await fetch(API_ENDPOINTS.customers(), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

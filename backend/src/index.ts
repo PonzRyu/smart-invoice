@@ -12,10 +12,18 @@ import { StoreMaster } from './database/entities/StoreMaster';
 config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '3001', 10);
+const HOST = process.env.HOST || '0.0.0.0'; // すべてのインターフェースでリッスン
 
 // Middleware
-app.use(cors());
+// CORS設定：すべてのオリジンを許可（本番環境では適切なオリジンを指定することを推奨）
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -228,7 +236,7 @@ app.post('/api/invoices/upload', async (req, res) => {
 
   if (summaries.length === 0) {
     return res.status(400).json({
-      error: '元データにレコードが存在しません。',
+      error: 'お客様利用データにレコードが存在しません。',
     });
   }
 
@@ -262,7 +270,7 @@ app.post('/api/invoices/upload', async (req, res) => {
   if (missingHeaders.length > 0) {
     return res.status(400).json({
       error: [
-        '元データが不正です。元データの中身をご確認ください。',
+        'お客様利用データが不正です。お客様利用データの中身をご確認ください。',
         `${missingHeaders.join(', ')}データが存在しません。`,
       ],
     });
@@ -273,8 +281,8 @@ app.post('/api/invoices/upload', async (req, res) => {
   if (uniqueCompanies.size !== 1) {
     return res.status(400).json({
       error: [
-        '元データが不正です。元データの中身をご確認ください。',
-        '元データに複数の顧客(Company)が含まれています。元データは必ず1つの顧客を指定して出力してください。',
+        'お客様利用データが不正です。お客様利用データの中身をご確認ください。',
+        'お客様利用データに複数の顧客(Company)が含まれています。お客様利用データは必ず1つの顧客を指定して出力してください。',
       ],
     });
   }
@@ -284,9 +292,9 @@ app.post('/api/invoices/upload', async (req, res) => {
   if (csvCompany !== companyCode) {
     return res.status(400).json({
       error: [
-        '利用顧客名と元データの顧客名が一致しないです。元データの中身をご確認ください。',
+        '利用顧客名とお客様利用データの顧客名が一致しないです。お客様利用データの中身をご確認ください。',
         `利用顧客名:${companyCode}`,
-        `元データー：${csvCompany}`,
+        `お客様利用データー：${csvCompany}`,
       ],
     });
   }
@@ -335,7 +343,7 @@ app.post('/api/invoices/upload', async (req, res) => {
       return res.status(400).json({
         error: [
           '利用年月が正しくありません。',
-          '元データの中身を確認して正しい利用年月を指定してください。',
+          'お客様利用データの中身を確認して正しい利用年月を指定してください。',
         ],
       });
     }
@@ -644,8 +652,9 @@ AppDataSource.initialize()
     console.log('Database connection established successfully');
 
     // Start server
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
+    app.listen(PORT, HOST, () => {
+      console.log(`Server is running on http://${HOST}:${PORT}`);
+      console.log(`Health check endpoint: http://${HOST}:${PORT}/health`);
     });
   })
   .catch((error: unknown) => {
