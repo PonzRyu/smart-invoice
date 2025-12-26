@@ -278,12 +278,29 @@ jobs:
             if ($LASTEXITCODE -eq 0) {
               Start-Sleep -Seconds 2
               
-              # 状態を確認
-              $state = & $appcmd list apppool "$appPoolName" /state 2>&1
-              if ($state -match "Started") {
-                Write-Host "Application pool started successfully"
-              } else {
-                Write-Warning "Application pool state: $state"
+              # 状態を確認（WebAdministrationモジュールを使用）
+              try {
+                Import-Module WebAdministration -ErrorAction Stop
+                $state = Get-WebAppPoolState -Name $appPoolName -ErrorAction Stop
+                if ($state.Value -eq "Started") {
+                  Write-Host "Application pool started successfully"
+                } else {
+                  Write-Warning "Application pool state: $($state.Value)"
+                }
+              } catch {
+                # WebAdministrationが使えない場合はappcmdの出力をパース
+                Write-Host "WebAdministration not available, using appcmd to check state..."
+                $appPoolInfo = & $appcmd list apppool "$appPoolName" 2>&1
+                if ($appPoolInfo -match "state:\s*(Started|Stopped)") {
+                  $state = $matches[1]
+                  if ($state -eq "Started") {
+                    Write-Host "Application pool started successfully"
+                  } else {
+                    Write-Warning "Application pool state: $state"
+                  }
+                } else {
+                  Write-Host "Application pool start command completed (unable to verify state)"
+                }
               }
             } else {
               Write-Error "Failed to start application pool. Exit code: $LASTEXITCODE"
