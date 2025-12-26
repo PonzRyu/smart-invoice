@@ -102,7 +102,6 @@ jobs:
           $appPoolName = "AimsSaaSInvoiceAppPool"
           $siteName = "AimsSaaSInvoice"
           $deployPath = "C:\inetpub\wwwroot\smart-invoice"
-          $port = 3000
           $hostName = "25.20.10.200"
           $appcmd = "$env:SystemRoot\System32\inetsrv\appcmd.exe"
 
@@ -130,127 +129,6 @@ jobs:
             # アプリケーションプールの設定
             Write-Host "Configuring application pool: $appPoolName"
             & $appcmd set apppool "$appPoolName" /processModel.idleTimeout:00:00:00 2>&1 | Out-Null
-
-            # サイトの作成または確認
-            $siteExists = & $appcmd list site "$siteName" 2>&1
-            if ($LASTEXITCODE -ne 0) {
-              Write-Host "Creating website: $siteName"
-              & $appcmd add site /name:"$siteName" /physicalPath:"$deployPath" /bindings:"http/*:${port}:" 2>&1 | Out-Null
-              
-              if ($LASTEXITCODE -eq 0) {
-                # アプリケーションプールを設定
-                & $appcmd set site "$siteName" /applicationPool:"$appPoolName" 2>&1 | Out-Null
-                Write-Host "Website created: $siteName"
-              } else {
-                Write-Warning "Failed to create website, but continuing..."
-              }
-            } else {
-              Write-Host "Website already exists: $siteName"
-              # 物理パスとアプリケーションプールを更新
-              & $appcmd set site "$siteName" /physicalPath:"$deployPath" 2>&1 | Out-Null
-              & $appcmd set site "$siteName" /applicationPool:"$appPoolName" 2>&1 | Out-Null
-            }
-
-            # HTTPSバインディングの確認と作成
-            $httpsBindingCheck = & $appcmd list site "$siteName" /config /xml 2>&1
-            $httpsBinding = $httpsBindingCheck | Select-String -Pattern "binding.*https.*$port" -ErrorAction SilentlyContinue
-            
-            if (-not $httpsBinding) {
-              Write-Host "Creating HTTPS binding for port $port"
-              
-              # WebAdministrationモジュールを優先的に使用
-              $bindingCreated = $false
-              try {
-                Import-Module WebAdministration -ErrorAction Stop
-                New-WebBinding -Name $siteName -Protocol https -Port $port -SslFlags 0 -ErrorAction Stop
-                Write-Host "HTTPS binding created using WebAdministration module"
-                $bindingCreated = $true
-              } catch {
-                Write-Host "WebAdministration module not available, trying appcmd..."
-                
-                # appcmdを使用（フォールバック）
-                # バインディング情報を変数に構築して、適切にクォートで囲む
-                $bindingInfo = "*:${port}:"
-                $bindingArg = "/+bindings.[protocol='https',bindingInformation='$bindingInfo']"
-                $bindingResult = & $appcmd set site "$siteName" $bindingArg 2>&1
-                $bindingExitCode = $LASTEXITCODE
-                
-                if ($bindingExitCode -eq 0) {
-                  Write-Host "HTTPS binding created using appcmd"
-                  $bindingCreated = $true
-                } else {
-                  Write-Warning "Failed to create HTTPS binding (Exit code: $bindingExitCode)"
-                  Write-Warning "Output: $bindingResult"
-                  # HTTPSバインディングの作成に失敗しても続行（HTTPのみでも動作する）
-                }
-              }
-              
-              if (-not $bindingCreated) {
-                Write-Warning "HTTPS binding creation failed, but continuing with HTTP only"
-              }
-              
-              # 証明書の検索と設定（PowerShellを使用）
-              # 証明書設定は失敗してもワークフローを続行する（オプショナル）
-              Write-Host "Attempting to configure SSL certificate (optional)..."
-              $sslConfigSuccess = $false
-              
-              try {
-                # WebAdministrationモジュールのインポートを試行（失敗しても続行）
-                $moduleLoaded = $false
-                try {
-                  Import-Module WebAdministration -ErrorAction Stop
-                  $moduleLoaded = $true
-                } catch {
-                  Write-Warning "Could not import WebAdministration module. SSL certificate configuration will be skipped."
-                  Write-Warning "Error: $_"
-                }
-                
-                if ($moduleLoaded) {
-                  try {
-                    $cert = $null
-                    # 方法1: ホスト名で検索
-                    $cert = Get-ChildItem -Path Cert:\LocalMachine\My -ErrorAction SilentlyContinue | Where-Object { 
-                      $_.Subject -like "*$hostName*" -or ($_.DnsNameList -and $_.DnsNameList.Unicode -like "*$hostName*")
-                    } | Select-Object -First 1
-                    
-                    # 方法2: 有効な証明書を検索
-                    if (-not $cert) {
-                      $cert = Get-ChildItem -Path Cert:\LocalMachine\My -ErrorAction SilentlyContinue | Where-Object { 
-                        $_.NotAfter -gt (Get-Date) -and $_.HasPrivateKey
-                      } | Select-Object -First 1
-                    }
-                    
-                    if ($cert) {
-                      try {
-                        $binding = Get-WebBinding -Name $siteName -Protocol https -HostHeader "" -Port $port -ErrorAction Stop
-                        if ($binding) {
-                          $binding.AddSslCertificate($cert.Thumbprint, "My")
-                          Write-Host "SSL certificate configured: $($cert.Subject)"
-                          $sslConfigSuccess = $true
-                        }
-                      } catch {
-                        Write-Warning "HTTPS binding not found or could not configure SSL certificate."
-                        Write-Warning "Error: $_"
-                        Write-Warning "Certificate thumbprint: $($cert.Thumbprint)"
-                      }
-                    } else {
-                      Write-Warning "No suitable SSL certificate found."
-                    }
-                  } catch {
-                    Write-Warning "Error while searching for SSL certificate: $_"
-                  }
-                }
-              } catch {
-                Write-Warning "SSL certificate configuration failed: $_"
-              }
-              
-              if (-not $sslConfigSuccess) {
-                Write-Warning "SSL certificate was not configured automatically."
-                Write-Warning "Please configure SSL certificate manually in IIS Manager if HTTPS is required."
-              }
-            } else {
-              Write-Host "HTTPS binding already exists"
-            }
 
             Write-Host "IIS configuration completed"
           } catch {
@@ -323,26 +201,60 @@ jobs:
           }
 
           try {
-            # サイトの状態を確認
-            $siteState = & $appcmd list site "$siteName" /state 2>&1
+            # サイトの存在確認
+            $siteInfo = & $appcmd list site "$siteName" 2>&1
+            $siteExists = $LASTEXITCODE -eq 0
             
-            if ($LASTEXITCODE -eq 0) {
-              if ($siteState -notmatch "Started") {
-                Write-Host "Starting website: $siteName"
-                & $appcmd start site "$siteName" 2>&1 | Out-Null
-                Start-Sleep -Seconds 1
+            if ($siteExists) {
+              # WebAdministrationモジュールを使用して状態を確認
+              try {
+                Import-Module WebAdministration -ErrorAction Stop
+                $site = Get-WebSite -Name $siteName -ErrorAction Stop
+                $siteState = $site.State
+                
+                if ($siteState -ne "Started") {
+                  Write-Host "Starting website: $siteName (current state: $siteState)"
+                  Start-WebSite -Name $siteName -ErrorAction Stop
+                  Start-Sleep -Seconds 2
+                  
+                  # 状態を再確認
+                  $site = Get-WebSite -Name $siteName -ErrorAction Stop
+                  Write-Host "Website state: $($site.State)"
+                } else {
+                  Write-Host "Website is already started: $siteName"
+                }
+              } catch {
+                # WebAdministrationが使えない場合はappcmdを使用
+                Write-Host "WebAdministration not available, using appcmd..."
+                
+                # サイト情報から状態を抽出
+                $siteInfoOutput = & $appcmd list site "$siteName" 2>&1
+                if ($siteInfoOutput -match "state:\s*(Started|Stopped)") {
+                  $currentState = $matches[1]
+                  if ($currentState -ne "Started") {
+                    Write-Host "Starting website: $siteName (current state: $currentState)"
+                    & $appcmd start site "$siteName" 2>&1 | Out-Null
+                    Start-Sleep -Seconds 2
+                    
+                    # 最終状態を確認
+                    $siteInfoOutput = & $appcmd list site "$siteName" 2>&1
+                    if ($siteInfoOutput -match "state:\s*(Started|Stopped)") {
+                      Write-Host "Website state: $($matches[1])"
+                    }
+                  } else {
+                    Write-Host "Website is already started: $siteName"
+                  }
+                } else {
+                  Write-Host "Starting website: $siteName"
+                  & $appcmd start site "$siteName" 2>&1 | Out-Null
+                  Start-Sleep -Seconds 2
+                }
               }
               
-              # 最終状態を確認
-              $finalState = & $appcmd list site "$siteName" 2>&1 | Select-String -Pattern "state:" | ForEach-Object { $_.Line }
-              if ($finalState) {
-                Write-Host "Website state: $finalState"
-              } else {
-                Write-Host "Website verification completed"
-              }
               Write-Host "Deployment verification completed"
             } else {
               Write-Warning "Website not found: $siteName"
+              Write-Warning "Please check if the website was created successfully in the previous steps"
             }
           } catch {
             Write-Error "Failed to verify deployment: $_"
