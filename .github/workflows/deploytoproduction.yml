@@ -195,7 +195,7 @@ jobs:
           $backendPort = "${{ secrets.BACKEND_PORT }}"
 
           # デフォルト値を設定
-          if ([string]::IsNullOrEmpty($dbHost)) { $dbHost = "25.20.10.200" }
+          if ([string]::IsNullOrEmpty($dbHost)) { $dbHost = "localhost" }
           if ([string]::IsNullOrEmpty($dbPort)) { $dbPort = "5432" }
           if ([string]::IsNullOrEmpty($dbUsername)) { $dbUsername = "postgres" }
           if ([string]::IsNullOrEmpty($dbPassword)) { $dbPassword = "postgres" }
