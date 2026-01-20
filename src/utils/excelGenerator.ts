@@ -248,9 +248,25 @@ export async function generateInvoiceExcel(
   };
 
   // 店舗別明細データを「店舗別明細」シートに書き込む
+  // usage_daysが0、または金額が0円のデータは除外
+  const daysInMonth = getDaysInMonth(invoiceData.issuedDate);
+  const filteredStoreSummaries = storeSummaries.filter((summary) => {
+    // usage_daysが0の場合は除外
+    if (summary.usage_days === 0) {
+      return false;
+    }
+    // 金額を計算（Excelの数式と同じ計算）
+    const calculatedPrice =
+      (summary.avg_label_count * unitPrice * summary.usage_days) / daysInMonth;
+    // 小数点2桁までに丸める（ExcelのROUND関数と同様）
+    const roundedPrice = Math.round(calculatedPrice * 100) / 100;
+    // 金額が0円の場合は除外
+    return roundedPrice !== 0;
+  });
+
   // 3行目からスタート
   const startRow = 3;
-  storeSummaries.forEach((summary, index) => {
+  filteredStoreSummaries.forEach((summary, index) => {
     const row = startRow + index;
 
     // B列: store_code
