@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { TopBar } from '../parts/TopBar';
 import { NavigationRail } from '../parts/NavigationRail';
 import { BottomBar } from '../parts/BottomBar';
-import { API_ENDPOINTS } from '../utils/config';
 import modifyIcon from '../styles/raws/modify_raw.svg';
 import deleteIcon from '../styles/raws/delete_raw.svg';
 import searchIcon from '../styles/raws/search_raw.svg';
@@ -10,20 +9,13 @@ import arrowBackIcon from '../styles/raws/list_arrow_back_raw.svg';
 import arrowNextIcon from '../styles/raws/list_arrow_next_raw.svg';
 import arrowDropDownIcon from '../styles/raws/arrow_drop_down_raw.svg';
 import '../styles/styles.css';
-
-/**
- * 顧客情報の型定義
- */
-interface Customer {
-  id: number;
-  company_name: string;
-  company_code: string;
-  currency: string;
-  unit_price: number;
-  si_partner_name: string;
-  updated_at: string;
-  created_at: string;
-}
+import {
+  createCustomer,
+  deleteCustomer,
+  fetchCustomers,
+  type Customer,
+  updateCustomer,
+} from '../services/customerService';
 
 /**
  * 顧客管理ページコンポーネント
@@ -54,35 +46,22 @@ export const CustomerManagementPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
-  // 顧客データ取得
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
-
-  const fetchCustomers = async () => {
+  const fetchCustomersAndSet = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(API_ENDPOINTS.customers());
-      if (response.ok) {
-        const data = await response.json();
-        // unit_priceを確実に数値型に変換
-        const normalizedData = data.map((customer: Customer) => ({
-          ...customer,
-          unit_price:
-            typeof customer.unit_price === 'string'
-              ? parseFloat(customer.unit_price)
-              : customer.unit_price,
-        }));
-        setCustomers(normalizedData);
-      } else {
-        console.error('Failed to fetch customers');
-      }
+      const data = await fetchCustomers();
+      setCustomers(data);
     } catch (error) {
       console.error('Error fetching customers:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [fetchCustomers]);
+
+  // 顧客データ取得
+  useEffect(() => {
+    fetchCustomersAndSet();
+  }, [fetchCustomersAndSet]);
 
   // 編集開始
   const handleEdit = (customer: Customer) => {
@@ -134,19 +113,9 @@ export const CustomerManagementPage = () => {
     }
 
     try {
-      const response = await fetch(
-        API_ENDPOINTS.customer(id),
-        {
-          method: 'DELETE',
-        }
-      );
-
-      if (response.ok) {
-        await fetchCustomers();
-        alert('削除が完了しました。');
-      } else {
-        alert('削除に失敗しました。');
-      }
+      await deleteCustomer(id);
+      await fetchCustomersAndSet();
+      alert('削除が完了しました。');
     } catch (error) {
       console.error('Error deleting customer:', error);
       alert('削除に失敗しました。');
@@ -216,54 +185,29 @@ export const CustomerManagementPage = () => {
 
       // 編集された顧客の更新
       for (const [id, customer] of editedCustomers) {
-        const response = await fetch(
-          API_ENDPOINTS.customer(id),
-          {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              company_name: customer.company_name,
-              company_code: customer.company_code,
-              currency: customer.currency,
-              unit_price: customer.unit_price,
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to update customer');
-        }
+        await updateCustomer(id, {
+          company_name: customer.company_name,
+          company_code: customer.company_code,
+          currency: customer.currency,
+          unit_price: customer.unit_price,
+        });
       }
 
       // 新規顧客の追加
       if (isAdding) {
-        const response = await fetch(API_ENDPOINTS.customers(), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            company_name: newCustomer.company_name,
-            company_code: newCustomer.company_code,
-            currency: newCustomer.currency,
-            unit_price: Number(newCustomer.unit_price),
-          }),
+        await createCustomer({
+          company_name: newCustomer.company_name,
+          company_code: newCustomer.company_code,
+          currency: newCustomer.currency,
+          unit_price: Number(newCustomer.unit_price),
         });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to create customer');
-        }
       }
 
       // 状態リセットとデータ再取得
       setEditedCustomers(new Map());
       setEditingId(null);
       setIsAdding(false);
-      await fetchCustomers();
+      await fetchCustomersAndSet();
       alert('保存が完了しました。');
     } catch (error) {
       console.error('Error saving:', error);
