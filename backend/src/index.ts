@@ -12,8 +12,8 @@ import { StoreMaster } from './database/entities/StoreMaster';
 config();
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '3001', 10);
-const HOST = process.env.HOST || '0.0.0.0'; // すべてのインターフェースでリッスン
+const PORT = parseInt(process.env.PORT ?? '3001', 10);
+const HOST = process.env.HOST ?? 'localhost';
 
 // Middleware
 // CORS設定：すべてのオリジンを許可（本番環境では適切なオリジンを指定することを推奨）

@@ -5,9 +5,7 @@
 
 // Viteでは環境変数にVITE_プレフィックスが必要
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  import.meta.env.VITE_BACKEND_URL ||
-  ''; // デフォルトを空文字（相対パス）に変更
+  import.meta.env.VITE_API_BASE_URL;
 
 // 相対パスでも動作するようにする（本番環境で同じドメインで提供する場合）
 export const getApiUrl = (path: string): string => {
