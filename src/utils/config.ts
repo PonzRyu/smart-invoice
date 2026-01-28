@@ -1,11 +1,13 @@
 /**
- * アプリケーション設定
- * 環境変数からAPIエンドポイントなどの設定を取得します
+ * アプリケーション共通設定
+ * - 環境変数からベースURLを取得
+ * - 相対パスをフルURLに変換するヘルパのみを提供
+ *
+ * 具体的な API パス定義は src/services/apiRoutes.ts に集約します。
  */
 
 // Viteでは環境変数にVITE_プレフィックスが必要
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // 相対パスでも動作するようにする（本番環境で同じドメインで提供する場合）
 export const getApiUrl = (path: string): string => {
@@ -28,29 +30,7 @@ export const getApiUrl = (path: string): string => {
   return `${baseUrl}${apiPath}`;
 };
 
-// APIエンドポイントのヘルパー関数
-export const API_ENDPOINTS = {
-  customers: () => getApiUrl('/api/customers'),
-  customer: (id: string | number) => getApiUrl(`/api/customers/${id}`),
-  invoices: {
-    upload: () => getApiUrl('/api/invoices/upload'),
-  },
-  issuedInvoices: (companyCode?: string) => {
-    const baseUrl = getApiUrl('/api/issued-invoices');
-    return companyCode
-      ? `${baseUrl}?companyCode=${encodeURIComponent(companyCode)}`
-      : baseUrl;
-  },
-  storeSummaries: (companyCode?: string) => {
-    const baseUrl = getApiUrl('/api/store-summaries');
-    return companyCode
-      ? `${baseUrl}?companyCode=${encodeURIComponent(companyCode)}`
-      : baseUrl;
-  },
-};
-
 export default {
   API_BASE_URL,
   getApiUrl,
-  API_ENDPOINTS,
 };

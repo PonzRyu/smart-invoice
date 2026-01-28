@@ -4,12 +4,16 @@ import Papa from 'papaparse/papaparse.js';
 import { TopBar } from '../parts/TopBar';
 import { NavigationRail } from '../parts/NavigationRail';
 import { BottomBar } from '../parts/BottomBar';
-import { API_ENDPOINTS } from '../utils/config';
 import fileCsvIcon from '../styles/raws/file_csv_raw.svg';
 import linkIcon from '../styles/raws/link_raw.svg';
 import questionIcon from '../styles/raws/question_raw.svg';
 import warningIcon from '../styles/raws/warning_raw.svg';
 import '../styles/styles.css';
+import { fetchCustomers as fetchCustomerList } from '../services/customerService';
+import {
+  type UploadInvoiceRequest,
+  uploadInvoiceSummaries,
+} from '../services/invoiceService';
 
 type ModalMode = 'confirm' | 'processing' | 'error' | 'success';
 
@@ -277,11 +281,7 @@ export const CreateInvoicePage = () => {
       setIsLoadingCustomers(true);
       setCustomerFetchError(null);
       try {
-        const response = await fetch(API_ENDPOINTS.customers());
-        if (!response.ok) {
-          throw new Error('顧客情報の取得に失敗しました。');
-        }
-        const data: Customer[] = await response.json();
+        const data = await fetchCustomerList();
         setCustomers(data);
       } catch (error) {
         console.error('Error fetching customers:', error);
@@ -296,7 +296,7 @@ export const CreateInvoicePage = () => {
     };
 
     fetchCustomers();
-  }, []);
+  }, [fetchCustomerList]);
 
   // 為替入力不可の場合は値をリセット
   useEffect(() => {
@@ -482,49 +482,17 @@ export const CreateInvoicePage = () => {
           ? Number(ttmString)
           : null;
 
-      const response = await fetch(
-        API_ENDPOINTS.invoices.upload(),
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            companyId: selectedCustomer.id,
-            companyCode: selectedCustomer.company_code,
-            companyName: selectedCustomer.company_name,
-            issuedDate: issuedMonth,
-            currency: selectedCustomer.currency,
-            ttm: ttmValue,
-            summaries: validationResult.records,
-          }),
-        }
-      );
+      const payload: UploadInvoiceRequest = {
+        companyId: selectedCustomer.id,
+        companyCode: selectedCustomer.company_code,
+        companyName: selectedCustomer.company_name,
+        issuedDate: issuedMonth,
+        currency: selectedCustomer.currency,
+        ttm: ttmValue,
+        summaries: validationResult.records,
+      };
 
-      if (!response.ok) {
-        let errorMessages: string[] = [
-          'アップロードに失敗しました。時間をおいて再度お試しください。',
-        ];
-
-        try {
-          const errorBody = await response.json();
-          if (Array.isArray(errorBody?.error)) {
-            errorMessages = errorBody.error;
-          } else if (typeof errorBody?.error === 'string') {
-            errorMessages = [errorBody.error];
-          }
-        } catch (parseError) {
-          console.error('Failed to parse error response:', parseError);
-        }
-
-        setModalMode('error');
-        setModalMessages(errorMessages);
-        setUploadProgress(0);
-        setUploadProgressLabel('');
-        return;
-      }
-
-      const result = await response.json();
+      const result = await uploadInvoiceSummaries(payload);
 
       setUploadProgress(100);
       setUploadProgressLabel('アップロードが完了しました。');
