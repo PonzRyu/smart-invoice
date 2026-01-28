@@ -35,7 +35,7 @@ app.get('/health', (req, res) => {
 // 顧客管理APIエンドポイント
 
 // 全顧客取得（ASC順）
-app.get('/api/customers', async (req, res) => {
+app.get('/api/v1/customers', async (req, res) => {
   try {
     const customerRepository = AppDataSource.getRepository(CustomerInfo);
     const customers = await customerRepository.find({
@@ -51,7 +51,7 @@ app.get('/api/customers', async (req, res) => {
 });
 
 // 特定顧客取得
-app.get('/api/customers/:id', async (req, res) => {
+app.get('/api/v1/customers/:id', async (req, res) => {
   try {
     const customerRepository = AppDataSource.getRepository(CustomerInfo);
     const customer = await customerRepository.findOne({
@@ -70,7 +70,7 @@ app.get('/api/customers/:id', async (req, res) => {
 });
 
 // 顧客作成
-app.post('/api/customers', async (req, res) => {
+app.post('/api/v1/customers', async (req, res) => {
   try {
     const customerRepository = AppDataSource.getRepository(CustomerInfo);
     const { company_code, company_name, unit_price, currency } = req.body;
@@ -118,7 +118,7 @@ app.post('/api/customers', async (req, res) => {
 });
 
 // 顧客更新
-app.put('/api/customers/:id', async (req, res) => {
+app.put('/api/v1/customers/:id', async (req, res) => {
   try {
     const customerRepository = AppDataSource.getRepository(CustomerInfo);
     const customer = await customerRepository.findOne({
@@ -164,7 +164,7 @@ app.put('/api/customers/:id', async (req, res) => {
 });
 
 // 顧客削除
-app.delete('/api/customers/:id', async (req, res) => {
+app.delete('/api/v1/customers/:id', async (req, res) => {
   try {
     const customerRepository = AppDataSource.getRepository(CustomerInfo);
     const customer = await customerRepository.findOne({
@@ -210,7 +210,7 @@ const REQUIRED_HEADERS = [
   'Product Updated',
 ];
 
-app.post('/api/invoices/upload', async (req, res) => {
+app.post('/api/v1/invoices/upload', async (req, res) => {
   const {
     companyId,
     companyCode,
@@ -545,7 +545,7 @@ app.post('/api/invoices/upload', async (req, res) => {
 });
 
 // 請求書発行情報取得
-app.get('/api/issued-invoices', async (req, res) => {
+const getIssuedInvoicesHandler = async (req: any, res: any) => {
   try {
     const { companyCode } = req.query;
 
@@ -575,10 +575,13 @@ app.get('/api/issued-invoices', async (req, res) => {
     console.error('Error fetching issued invoices:', error);
     res.status(500).json({ error: 'Failed to fetch issued invoices' });
   }
-});
+};
+
+// 新URL（推奨）
+app.get('/api/v1/invoices/issued', getIssuedInvoicesHandler);
 
 // 店舗別明細データ取得（集計済み）
-app.get('/api/store-summaries', async (req, res) => {
+const getStoreSummariesHandler = async (req: any, res: any) => {
   try {
     const { companyCode, issuedDate } = req.query;
 
@@ -644,7 +647,10 @@ app.get('/api/store-summaries', async (req, res) => {
     console.error('Error fetching store summaries:', error);
     res.status(500).json({ error: 'Failed to fetch store summaries' });
   }
-});
+};
+
+// 新URL（推奨）
+app.get('/api/v1/invoices/summaries', getStoreSummariesHandler);
 
 // Initialize database connection
 AppDataSource.initialize()

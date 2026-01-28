@@ -30,19 +30,19 @@ export const getApiUrl = (path: string): string => {
 
 // APIエンドポイントのヘルパー関数
 export const API_ENDPOINTS = {
-  customers: () => getApiUrl('/api/customers'),
-  customer: (id: string | number) => getApiUrl(`/api/customers/${id}`),
+  customers: () => getApiUrl('/api/v1/customers'),
+  customer: (id: string | number) => getApiUrl(`/api/v1/customers/${id}`),
   invoices: {
-    upload: () => getApiUrl('/api/invoices/upload'),
+    upload: () => getApiUrl('/api/v1/invoices/upload'),
   },
   issuedInvoices: (companyCode?: string) => {
-    const baseUrl = getApiUrl('/api/issued-invoices');
+    const baseUrl = getApiUrl('/api/v1/invoices/issued');
     return companyCode
       ? `${baseUrl}?companyCode=${encodeURIComponent(companyCode)}`
       : baseUrl;
   },
   storeSummaries: (companyCode?: string) => {
-    const baseUrl = getApiUrl('/api/store-summaries');
+    const baseUrl = getApiUrl('/api/v1/invoices/summaries');
     return companyCode
       ? `${baseUrl}?companyCode=${encodeURIComponent(companyCode)}`
       : baseUrl;
