@@ -166,7 +166,7 @@ npm start
 ## ディレクトリ構成
 
 ### 1. ルート構成
-
+```
 smart-invoice/
 ├─ src/                     # フロントエンド（React + Vite）
 ├─ backend/                 # バックエンド（APIサーバ）
@@ -184,9 +184,10 @@ smart-invoice/
 ├─ web.config
 ├─ README.md
 └─ DEPLOYMENT.md
+```
 
 ### 2. フロントエンド構成
-
+```
 src/
 ├─ main.tsx                 # エントリポイント
 ├─ App.tsx                  # ルートコンポーネント
@@ -199,8 +200,10 @@ src/
 ├─ styles/                  # スタイル関連
 ├─ types/                   # 型定義
 └─ vite-env.d.ts
+```
 
 ### 3. バックエンド構成
+```
 backend/
 ├─ package.json
 ├─ package-lock.json
@@ -221,7 +224,7 @@ backend/
    ├─ middlewares/          # 共通ミドルウェア
    └─ utils/                # ユーティリティ
       └─ httpError.ts
-
+```
 
 ## デプロイメント
 
