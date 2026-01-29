@@ -8,6 +8,8 @@ import searchIcon from '../styles/raws/search_raw.svg';
 import arrowBackIcon from '../styles/raws/list_arrow_back_raw.svg';
 import arrowNextIcon from '../styles/raws/list_arrow_next_raw.svg';
 import arrowDropDownIcon from '../styles/raws/arrow_drop_down_raw.svg';
+import questionIcon from '../styles/raws/question_raw.svg';
+import warningIcon from '../styles/raws/warning_raw.svg';
 import '../styles/styles.css';
 import {
   createCustomer,
@@ -22,6 +24,8 @@ import {
  * 顧客情報の一覧表示、追加、編集、削除機能を提供
  */
 export const CustomerManagementPage = () => {
+  type NoticeModalMode = 'info' | 'success' | 'error';
+
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -29,11 +33,26 @@ export const CustomerManagementPage = () => {
     new Map()
   );
   const [isAdding, setIsAdding] = useState(false);
+  const [noticeModal, setNoticeModal] = useState<{
+    mode: NoticeModalMode;
+    messages: string[];
+  } | null>(null);
+  const [deleteTargetCustomer, setDeleteTargetCustomer] =
+    useState<Customer | null>(null);
+  const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
+  const openNoticeModal = (mode: NoticeModalMode, message: string | string[]) =>
+    setNoticeModal({
+      mode,
+      messages: Array.isArray(message) ? message : [message],
+    });
+  const closeNoticeModal = () => setNoticeModal(null);
+
   const [newCustomer, setNewCustomer] = useState<
-    Omit<Customer, 'id' | 'created_at' | 'updated_at' | 'si_partner_name'>
+    Omit<Customer, 'id' | 'created_at' | 'updated_at'>
   >({
     company_name: '',
     company_code: '',
+    si_partner_name: '',
     currency: '',
     unit_price: 0,
   });
@@ -106,19 +125,30 @@ export const CustomerManagementPage = () => {
     }
   };
 
-  // 削除
-  const handleDelete = async (id: number) => {
-    if (!confirm('この顧客を削除してもよろしいですか？')) {
-      return;
-    }
+  // 削除（確認モーダルを開く）
+  const handleRequestDelete = (customer: Customer) => {
+    setDeleteTargetCustomer(customer);
+  };
 
+  const handleCancelDelete = () => {
+    if (isDeletingCustomer) return;
+    setDeleteTargetCustomer(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTargetCustomer) return;
+    setIsDeletingCustomer(true);
     try {
-      await deleteCustomer(id);
+      await deleteCustomer(deleteTargetCustomer.id);
       await fetchCustomersAndSet();
-      alert('削除が完了しました。');
+      openNoticeModal('success', '削除が完了しました。');
+      setDeleteTargetCustomer(null);
     } catch (error) {
       console.error('Error deleting customer:', error);
-      alert('削除に失敗しました。');
+      setDeleteTargetCustomer(null);
+      openNoticeModal('error', `既に請求データがある場合、顧客の削除はできません。`);
+    } finally {
+      setIsDeletingCustomer(false);
     }
   };
 
@@ -128,6 +158,7 @@ export const CustomerManagementPage = () => {
     setNewCustomer({
       company_name: '',
       company_code: '',
+      si_partner_name: '',
       currency: '',
       unit_price: 0,
     });
@@ -139,6 +170,7 @@ export const CustomerManagementPage = () => {
     setNewCustomer({
       company_name: '',
       company_code: '',
+      si_partner_name: '',
       currency: '',
       unit_price: 0,
     });
@@ -148,7 +180,7 @@ export const CustomerManagementPage = () => {
   const handleNewCustomerChange = (
     field: keyof Omit<
       Customer,
-      'id' | 'created_at' | 'updated_at' | 'si_partner_name'
+      'id' | 'created_at' | 'updated_at'
     >,
     value: string | number
   ) => {
@@ -167,18 +199,46 @@ export const CustomerManagementPage = () => {
   // 保存
   const handleSave = async () => {
     try {
+      // 既存顧客のSIパートナ名必須チェック
+      for (const [, customer] of editedCustomers) {
+        const siName =
+          typeof customer.si_partner_name === 'string'
+            ? customer.si_partner_name.trim()
+            : '';
+        if (!siName) {
+          openNoticeModal('error', 'SIパートナ名は必須項目です。');
+          return;
+        }
+        const unitPriceNumber =
+          typeof customer.unit_price === 'string'
+            ? parseFloat(customer.unit_price)
+            : customer.unit_price;
+        if (isNaN(unitPriceNumber) || !(unitPriceNumber > 0)) {
+          openNoticeModal('error', '単価は0より大きい数値を入力してください。');
+          return;
+        }
+      }
+
       // 新規顧客追加時のバリデーション
       if (isAdding) {
         if (!newCustomer.company_name || !newCustomer.company_code) {
-          alert('顧客名と顧客コードは必須項目です。');
+          openNoticeModal('error', '顧客名と顧客コードは必須項目です。');
           return;
         }
         if (!newCustomer.currency) {
-          alert('通貨単位は必須項目です。');
+          openNoticeModal('error', '通貨単位は必須項目です。');
           return;
         }
-        if (isNaN(newCustomer.unit_price) || newCustomer.unit_price < 0) {
-          alert('単価は有効な数値を入力してください。');
+        const siName =
+          typeof newCustomer.si_partner_name === 'string'
+            ? newCustomer.si_partner_name.trim()
+            : '';
+        if (!siName) {
+          openNoticeModal('error', 'SIパートナ名は必須項目です。');
+          return;
+        }
+        if (isNaN(newCustomer.unit_price) || !(newCustomer.unit_price > 0)) {
+          openNoticeModal('error', '単価は0より大きい数値を入力してください。');
           return;
         }
       }
@@ -188,6 +248,7 @@ export const CustomerManagementPage = () => {
         await updateCustomer(id, {
           company_name: customer.company_name,
           company_code: customer.company_code,
+          si_partner_name: customer.si_partner_name,
           currency: customer.currency,
           unit_price: customer.unit_price,
         });
@@ -198,6 +259,7 @@ export const CustomerManagementPage = () => {
         await createCustomer({
           company_name: newCustomer.company_name,
           company_code: newCustomer.company_code,
+          si_partner_name: newCustomer.si_partner_name,
           currency: newCustomer.currency,
           unit_price: Number(newCustomer.unit_price),
         });
@@ -208,10 +270,13 @@ export const CustomerManagementPage = () => {
       setEditingId(null);
       setIsAdding(false);
       await fetchCustomersAndSet();
-      alert('保存が完了しました。');
+      openNoticeModal('success', '保存が完了しました。');
     } catch (error) {
       console.error('Error saving:', error);
-      alert(error instanceof Error ? error.message : '保存に失敗しました。');
+      openNoticeModal(
+        'error',
+        error instanceof Error ? error.message : '保存に失敗しました。'
+      );
     }
   };
 
@@ -355,6 +420,9 @@ export const CustomerManagementPage = () => {
                 <div className="customer-list-header">
                   <div className="customer-list-cell cell-name">顧客名</div>
                   <div className="customer-list-cell cell-code">顧客コード</div>
+                  <div className="customer-list-cell cell-si-partner">
+                    SIパートナ名
+                  </div>
                   <div className="customer-list-cell cell-currency">
                     通貨単位
                   </div>
@@ -407,6 +475,25 @@ export const CustomerManagementPage = () => {
                           />
                         ) : (
                           data.company_code
+                        )}
+                      </div>
+                      <div className="customer-list-cell cell-si-partner">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            className="cell-input"
+                            value={data.si_partner_name}
+                            onChange={(e) =>
+                              handleEditChange(
+                                customer.id,
+                                'si_partner_name',
+                                e.target.value
+                              )
+                            }
+                            placeholder="株式会社○○○○"
+                          />
+                        ) : (
+                          data.si_partner_name
                         )}
                       </div>
                       <div className="customer-list-cell cell-currency">
@@ -478,7 +565,7 @@ export const CustomerManagementPage = () => {
                             </button>
                             <button
                               className="action-icon-button"
-                              onClick={() => handleDelete(customer.id)}
+                              onClick={() => handleRequestDelete(customer)}
                               title="削除"
                             >
                               <img
@@ -523,6 +610,20 @@ export const CustomerManagementPage = () => {
                           )
                         }
                         placeholder="○○○"
+                      />
+                    </div>
+                    <div className="customer-list-cell cell-si-partner">
+                      <input
+                        type="text"
+                        className="cell-input"
+                        value={newCustomer.si_partner_name}
+                        onChange={(e) =>
+                          handleNewCustomerChange(
+                            'si_partner_name',
+                            e.target.value
+                          )
+                        }
+                        placeholder="株式会社○○○○"
                       />
                     </div>
                     <div className="customer-list-cell cell-currency">
@@ -595,6 +696,122 @@ export const CustomerManagementPage = () => {
       <TopBar headline="顧客管理" />
       <NavigationRail />
       <BottomBar />
+
+      {/* 通知モーダル（alert代替） */}
+      {noticeModal && (
+        <div
+          className="confirm-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              closeNoticeModal();
+            }
+          }}
+        >
+          <div className="confirm-modal">
+            <div
+              className={`confirm-modal__icon confirm-modal__icon--${
+                noticeModal.mode === 'error' ? 'error' : 'confirm'
+              }`}
+            >
+              <img
+                src={noticeModal.mode === 'error' ? warningIcon : questionIcon}
+                alt={noticeModal.mode === 'error' ? '警告' : '確認'}
+              />
+            </div>
+            <div className="confirm-modal__body">
+              {noticeModal.mode === 'error' ? (
+                <div className="confirm-modal__error">
+                  {noticeModal.messages.map((message, index) => (
+                    <p
+                      key={`${message}-${index}`}
+                      className="confirm-modal__error-line"
+                    >
+                      {message}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p className="confirm-modal__message">
+                  {noticeModal.messages.map((message, index) => (
+                    <span key={`${message}-${index}`}>
+                      {message}
+                      {index < noticeModal.messages.length - 1 && <br />}
+                    </span>
+                  ))}
+                </p>
+              )}
+            </div>
+            <div className="confirm-modal__actions">
+              <button
+                type="button"
+                className="btn btn-submit"
+                onClick={closeNoticeModal}
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 削除確認モーダル（他ページのconfirm-modalとデザイン統一） */}
+      {deleteTargetCustomer && (
+        <div
+          className="confirm-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              handleCancelDelete();
+            }
+          }}
+        >
+          <div className="confirm-modal">
+            <div className="confirm-modal__icon confirm-modal__icon--confirm">
+              <img src={questionIcon} alt="確認" />
+            </div>
+            <div className="confirm-modal__body">
+              <p className="confirm-modal__message">
+                以下の顧客を削除します。よろしいですか？
+              </p>
+              <ul className="confirm-modal__summary">
+                <li className="confirm-modal__summary-item">
+                  <span className="summary-label">顧客名</span>
+                  <span className="summary-value">
+                    {deleteTargetCustomer.company_name}
+                  </span>
+                </li>
+                <li className="confirm-modal__summary-item">
+                  <span className="summary-label">顧客コード</span>
+                  <span className="summary-value">
+                    {deleteTargetCustomer.company_code}
+                  </span>
+                </li>
+              </ul>
+            </div>
+            <div className="confirm-modal__actions">
+              <button
+                type="button"
+                className="btn btn-cancel"
+                onClick={handleCancelDelete}
+                disabled={isDeletingCustomer}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                className="btn btn-submit"
+                onClick={handleConfirmDelete}
+                disabled={isDeletingCustomer}
+              >
+                {isDeletingCustomer ? '削除中...' : '削除'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

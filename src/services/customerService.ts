@@ -24,6 +24,7 @@ export interface CustomerPayload {
   company_code: string;
   currency: string;
   unit_price: number;
+  si_partner_name: string;
 }
 
 /**
