@@ -379,7 +379,7 @@ export const IssueInvoicePage = () => {
               <>
                 <div className="issue-invoice-excess-description">
                   <span className="issue-invoice-required-marker">*</span>
-                  商品更新数110%超過分を請求します。
+                  商品更新数がラベル数の110%を超えた場合、超過分を請求します。
                 </div>
                 <div className="customer-list issue-invoice-list">
                   <div className="customer-list-header issue-invoice-header">
@@ -397,9 +397,9 @@ export const IssueInvoicePage = () => {
                     </div>
                     <div
                       className="customer-list-cell issue-invoice-cell issue-invoice-cell-toggle"
-                      title="商品更新数110%超過分を請求します。"
+                      title="ペナルティ請求"
                     >
-                      超過利用分の請求
+                      ペナルティ請求
                       <span className="issue-invoice-required-marker issue-invoice-required-marker--inline">
                         *
                       </span>
@@ -427,7 +427,7 @@ export const IssueInvoicePage = () => {
                       </div>
                       <div
                         className="customer-list-cell issue-invoice-cell issue-invoice-cell-toggle"
-                        title="商品更新数110%超過分を請求します。"
+                        title="ペナルティ請求"
                       >
                         <label className="toggle-switch toggle-switch-small">
                           <input
