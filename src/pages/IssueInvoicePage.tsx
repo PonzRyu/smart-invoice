@@ -231,7 +231,8 @@ export const IssueInvoicePage = () => {
       const selectedBillingDate = new Date(billingDate);
       const selectedPaymentDeadline = new Date(paymentDeadline);
 
-      // Excelファイルを生成してダウンロード
+      // Excelファイルを生成してダウンロード（ペナルティ請求ON時は110%超店舗で単価×商品更新数）
+      const penaltyBilling = excessBillingMap[pendingInvoice.id] ?? false;
       await generateInvoiceExcel(
         templateUrl,
         {
@@ -245,7 +246,8 @@ export const IssueInvoicePage = () => {
         },
         storeSummaries,
         selectedCustomer?.unit_price!,
-        selectedCustomer?.currency!
+        selectedCustomer?.currency!,
+        penaltyBilling
       );
     } catch (error) {
       console.error(error);
@@ -379,7 +381,7 @@ export const IssueInvoicePage = () => {
               <>
                 <div className="issue-invoice-excess-description">
                   <span className="issue-invoice-required-marker">*</span>
-                  商品更新数がラベル数の110%を超えた場合、超過分を請求します。
+                  ONにすると、商品更新率110%超の店舗は明細の金額が単価×商品更新数で計算されます。
                 </div>
                 <div className="customer-list issue-invoice-list">
                   <div className="customer-list-header issue-invoice-header">
