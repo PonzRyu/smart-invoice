@@ -76,15 +76,20 @@ function getDaysInMonth(issuedDate: string): number {
   return new Date(year, month, 0).getDate();
 }
 
+/** 商品更新率のペナルティ閾値（110%） */
+const PENALTY_UPDATE_RATE_THRESHOLD = 1.1;
+
 /**
  * Excelファイルを生成してダウンロード
+ * @param penaltyBilling trueの場合、商品更新率が110%を超えた店舗にペナルティ計算（単価×商品更新数）を適用
  */
 export async function generateInvoiceExcel(
   templateUrl: string,
   invoiceData: InvoiceData,
   storeSummaries: StoreSummary[],
   unitPrice: number,
-  currency: string
+  currency: string,
+  penaltyBilling: boolean = false
 ): Promise<void> {
   // テンプレートファイルを読み込み
   const response = await fetch(templateUrl);
@@ -269,6 +274,13 @@ export async function generateInvoiceExcel(
   filteredStoreSummaries.forEach((summary, index) => {
     const row = startRow + index;
 
+    // ペナルティ適用判定: 商品更新率 = 商品更新数 / ラベル数、110%超ならペナルティ計算
+    const applyPenalty =
+      penaltyBilling &&
+      summary.avg_label_count > 0 &&
+      summary.avg_product_update_count / summary.avg_label_count >
+        PENALTY_UPDATE_RATE_THRESHOLD;
+
     // B列: store_code
     const storeCodeCell = storeSheet.getCell(`B${row}`);
     storeCodeCell.value = summary.store_code;
@@ -333,8 +345,10 @@ export async function generateInvoiceExcel(
 
     const priceCell = storeSheet.getCell(`H${row}`);
     priceCell.numFmt = `"${currency}"#,##0.00`;
+    // ペナルティ時: 単価×商品更新数×日割り、通常: 単価×ラベル数×日割り
+    const quantityColumn = applyPenalty ? 'F' : 'E';
     priceCell.value = {
-      formula: `=ROUND(店舗別明細!$E${row}*${unitPrice}*${usageDaysCell.value}/${getDaysInMonth(invoiceData.issuedDate)}, 2)`,
+      formula: `=ROUND(店舗別明細!$${quantityColumn}${row}*${unitPrice}*${usageDaysCell.value}/${daysInMonth}, 2)`,
     };
     priceCell.alignment = {
       shrinkToFit: true,

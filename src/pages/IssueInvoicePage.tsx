@@ -3,7 +3,6 @@ import { useLocation } from 'react-router-dom';
 import { TopBar } from '../parts/TopBar';
 import { NavigationRail } from '../parts/NavigationRail';
 import { BottomBar } from '../parts/BottomBar';
-import { API_ENDPOINTS } from '../utils/config';
 import arrowBackIcon from '../styles/raws/list_arrow_back_raw.svg';
 import arrowNextIcon from '../styles/raws/list_arrow_next_raw.svg';
 import arrowDropDownIcon from '../styles/raws/arrow_drop_down_raw.svg';
@@ -13,25 +12,15 @@ import calendarIcon from '../styles/raws/calender_raw.svg';
 import { generateInvoiceExcel } from '../utils/excelGenerator';
 import templateUrl from '../assets/invoice_template.xlsx?url';
 import '../styles/styles.css';
-
-interface Customer {
-  id: number;
-  company_name: string;
-  company_code: string;
-  si_partner_name: string;
-  currency: string;
-  unit_price: number;
-}
-
-interface IssuedInvoice {
-  id: number;
-  company_code: string;
-  company_name: string;
-  issued_date: string;
-  invoice_code: number;
-  currency: string;
-  ttm: number | null;
-}
+import {
+  fetchCustomers as fetchCustomerList,
+  type Customer,
+} from '../services/customerService';
+import {
+  fetchIssuedInvoices,
+  fetchStoreSummaries,
+  type IssuedInvoice,
+} from '../services/invoiceService';
 
 export const IssueInvoicePage = () => {
   const location = useLocation();
@@ -63,14 +52,10 @@ export const IssueInvoicePage = () => {
   const [paymentDeadline, setPaymentDeadline] = useState<string>('');
 
   useEffect(() => {
-    const fetchCustomers = async () => {
+    const loadCustomers = async () => {
       setIsLoadingCustomers(true);
       try {
-        const response = await fetch(API_ENDPOINTS.customers());
-        if (!response.ok) {
-          throw new Error('顧客情報の取得に失敗しました。');
-        }
-        const data = await response.json();
+        const data = await fetchCustomerList();
         setCustomers(data);
       } catch (error) {
         console.error(error);
@@ -84,31 +69,15 @@ export const IssueInvoicePage = () => {
       }
     };
 
-    fetchCustomers();
-  }, []);
+    loadCustomers();
+  }, [fetchCustomerList]);
 
-  const fetchIssuedInvoices = useCallback(async (companyCode: string) => {
+  const fetchIssuedInvoicesAndSet = useCallback(async (companyCode: string) => {
     setIsLoadingInvoices(true);
     setErrorMessage('');
     try {
-      const response = await fetch(
-        API_ENDPOINTS.issuedInvoices(companyCode)
-      );
-
-      if (!response.ok) {
-        throw new Error('請求書情報の取得に失敗しました。');
-      }
-
-      const data: IssuedInvoice[] = await response.json();
-      const normalizedData = data.map((invoice) => ({
-        ...invoice,
-        ttm:
-          invoice.ttm !== null && invoice.ttm !== undefined
-            ? Number(invoice.ttm)
-            : null,
-      }));
-
-      setIssuedInvoices(normalizedData);
+      const data = await fetchIssuedInvoices(companyCode);
+      setIssuedInvoices(data);
     } catch (error) {
       console.error(error);
       setErrorMessage(
@@ -120,7 +89,7 @@ export const IssueInvoicePage = () => {
     } finally {
       setIsLoadingInvoices(false);
     }
-  }, []);
+  }, [fetchIssuedInvoices]);
 
   const handleCustomerChange = (
     event: React.ChangeEvent<HTMLSelectElement>
@@ -139,7 +108,7 @@ export const IssueInvoicePage = () => {
       (item) => item.company_code === companyCode
     );
     setSelectedCustomer(customer ?? null);
-    fetchIssuedInvoices(companyCode);
+    fetchIssuedInvoicesAndSet(companyCode);
   };
   useEffect(() => {
     if (!preselectedCompanyCode || customers.length === 0) {
@@ -151,8 +120,8 @@ export const IssueInvoicePage = () => {
       (item) => item.company_code === companyCode
     );
     setSelectedCustomer(customer ?? null);
-    fetchIssuedInvoices(companyCode);
-  }, [customers, fetchIssuedInvoices, preselectedCompanyCode]);
+    fetchIssuedInvoicesAndSet(companyCode);
+  }, [customers, fetchIssuedInvoicesAndSet, preselectedCompanyCode]);
 
   const handlePreviousPage = () => {
     if (currentPage > 1) {
@@ -253,20 +222,17 @@ export const IssueInvoicePage = () => {
 
     try {
       // 店舗別明細データを取得
-      const storeSummaryUrl = `${API_ENDPOINTS.storeSummaries(pendingInvoice.company_code)}&issuedDate=${encodeURIComponent(pendingInvoice.issued_date)}`;
-      const storeSummaryResponse = await fetch(storeSummaryUrl);
-
-      if (!storeSummaryResponse.ok) {
-        throw new Error('店舗別明細データの取得に失敗しました。');
-      }
-
-      const storeSummaries = await storeSummaryResponse.json();
+      const storeSummaries = await fetchStoreSummaries(
+        pendingInvoice.company_code,
+        pendingInvoice.issued_date
+      );
 
       // 選択された日付をDateオブジェクトに変換
       const selectedBillingDate = new Date(billingDate);
       const selectedPaymentDeadline = new Date(paymentDeadline);
 
-      // Excelファイルを生成してダウンロード
+      // Excelファイルを生成してダウンロード（ペナルティ請求ON時は110%超店舗で単価×商品更新数）
+      const penaltyBilling = excessBillingMap[pendingInvoice.id] ?? false;
       await generateInvoiceExcel(
         templateUrl,
         {
@@ -280,7 +246,8 @@ export const IssueInvoicePage = () => {
         },
         storeSummaries,
         selectedCustomer?.unit_price!,
-        selectedCustomer?.currency!
+        selectedCustomer?.currency!,
+        penaltyBilling
       );
     } catch (error) {
       console.error(error);
@@ -414,7 +381,7 @@ export const IssueInvoicePage = () => {
               <>
                 <div className="issue-invoice-excess-description">
                   <span className="issue-invoice-required-marker">*</span>
-                  商品更新数110%超過分を請求します。
+                  ONにすると、商品更新率110%超の店舗は明細の金額が単価×商品更新数で計算されます。
                 </div>
                 <div className="customer-list issue-invoice-list">
                   <div className="customer-list-header issue-invoice-header">
@@ -432,9 +399,9 @@ export const IssueInvoicePage = () => {
                     </div>
                     <div
                       className="customer-list-cell issue-invoice-cell issue-invoice-cell-toggle"
-                      title="商品更新数110%超過分を請求します。"
+                      title="ペナルティ請求"
                     >
-                      超過利用分の請求
+                      ペナルティ請求
                       <span className="issue-invoice-required-marker issue-invoice-required-marker--inline">
                         *
                       </span>
@@ -462,7 +429,7 @@ export const IssueInvoicePage = () => {
                       </div>
                       <div
                         className="customer-list-cell issue-invoice-cell issue-invoice-cell-toggle"
-                        title="商品更新数110%超過分を請求します。"
+                        title="ペナルティ請求"
                       >
                         <label className="toggle-switch toggle-switch-small">
                           <input

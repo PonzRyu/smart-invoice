@@ -95,6 +95,136 @@ npm start
 ```
 
 ---
+## システム構成
+
+### 1. 処理の流れ
+
+```bash
+[ユーザーのブラウザ]
+      │  HTTPS
+      ▼
+[Windows Server + IIS]
+  ├─ フロントエンド(PWA)
+  │   - React + Vite でビルドされた静的ファイル
+  │   - `https://<server>` で配信
+  │   - API ベースURL: `VITE_API_BASE_URL` (例: https://25.20.10.200:3443 / http://localhost:3001)
+  │
+  └─ (必要に応じてリバースプロキシで /api → バックエンドAPI に転送)
+
+      │  HTTP/HTTPS (REST API)
+      ▼
+[バックエンド API サーバー]
+  - Node.js + Express
+  - ディレクトリ: `backend/src`
+  - レイヤ構造:
+      routes → controllers → services → repositories → database(TypeORM)
+  - 主な責務:
+      ・顧客マスタ管理（CustomerInfo, StoreMaster, StoreSummary）
+      ・請求書発行・履歴管理（IssuedInvoice）
+      ・ヘルスチェック(health)
+
+      │  TCP (PostgreSQL)
+      ▼
+[PostgreSQL データベース]
+  - 開発環境: Podman + docker-compose でコンテナ起動
+  - TypeORM エンティティ:
+      CustomerInfo / IssuedInvoice / StoreMaster / StoreSummary
+  - マイグレーション: `backend/src/database/migrations/*`
+
+      ▲
+      │ CSVアップロード (ブラウザから)
+[外部システム：Metricsサイトなど]
+  - 利用実績CSVをユーザーがダウンロード
+  - 本アプリの画面からCSVをアップロード
+  - フロントの `excelGenerator.ts` 等で加工し、
+    バックエンド + DB と連携して請求書 Excel を生成
+```
+
+### 2.  運用・デプロイ構成
+```bash
+[GitHub リポジトリ]
+      │  push(main)
+      ▼
+[GitHub Actions]
+  - ワークフロー: `.github/workflows/deploytoproduction.yml`
+  - 自動ビルド & デプロイ
+      │
+      ▼
+[Self-hosted GitHub Actions Runner]
+(Windows Server 上で動作)
+      │
+      ├─ フロントエンドをビルド (npm run build)
+      │   → 出力物を IIS 配下 `C:\inetpub\wwwroot\smart-invoice` へ配置
+      │
+      └─ IIS 設定/アプリプール制御スクリプト実行
+          - AppPool: `AimsSaaSInvoiceAppPool`
+          - サイト名: `SmartInvoice`
+          - ポート: 443 (HTTPS)
+          - 証明書: Windows 証明書ストアの PFX を使用
+```
+
+## ディレクトリ構成
+
+### 1. ルート構成
+```
+smart-invoice/
+├─ src/                     # フロントエンド（React + Vite）
+├─ backend/                 # バックエンド（APIサーバ）
+├─ public/                  # 静的ファイル
+├─ tests/                   # テスト用データ（CSV など）
+├─ .github/
+├─ .vscode/
+├─ .cursor/
+├─ index.html
+├─ package.json             # フロント側
+├─ package-lock.json
+├─ vite.config.ts
+├─ tsconfig.json
+├─ tsconfig.node.json
+├─ web.config
+├─ README.md
+└─ DEPLOYMENT.md
+```
+
+### 2. フロントエンド構成
+```
+src/
+├─ main.tsx                 # エントリポイント
+├─ App.tsx                  # ルートコンポーネント
+├─ index.css                # グローバルスタイル
+├─ pages/                   # 画面単位コンポーネント
+├─ parts/                   # 共通UI部品
+├─ services/                # APIクライアント/サービス層
+├─ utils/                   # ユーティリティ
+├─ assets/                  # テンプレートなどの静的アセット
+├─ styles/                  # スタイル関連
+├─ types/                   # 型定義
+└─ vite-env.d.ts
+```
+
+### 3. バックエンド構成
+```
+backend/
+├─ package.json
+├─ package-lock.json
+├─ docker-compose.yml
+├─ tsconfig.json
+├─ README.md
+└─ src/
+   ├─ index.ts              # エントリポイント
+   ├─ app.ts                # Express アプリ設定
+   ├─ routes/               # ルーティング
+   ├─ controllers/          # コントローラ層
+   ├─ services/             # ビジネスロジック層
+   ├─ repositories/         # リポジトリ層（DBアクセス）
+   ├─ database/             # DB設定・スキーマ
+   │  ├─ data-source.ts
+   │  ├─ entities/
+   │  └─ migrations/
+   ├─ middlewares/          # 共通ミドルウェア
+   └─ utils/                # ユーティリティ
+      └─ httpError.ts
+```
 
 ## デプロイメント
 
