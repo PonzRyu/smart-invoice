@@ -1,6 +1,6 @@
 # smart-invoice
 
-Easily generate invoices based on db data.
+Easily generate invoices based on raw data.
 
 ---
 
@@ -78,20 +78,22 @@ export VITE_API_BASE_URL=http://localhost:3001
 ### 8. machine と開発用 DB の起動
 
 ```bash
-npm run start:machine
-npm run start:db
+npm run start:machine // podman machine 起動
+npm run start:db // db image 起動
 ```
 
 ### 9. 開発用 DB テーブルのマイグレーション
 
 ```bash
-npm run migration:run
+npm run migration:run // db entity マイグレーション
 ```
 
 ### 10. アプリの起動
 
 ```bash
-npm start
+npm run start // frontend 起動
+cd backend
+npm run start // backend 起動
 ```
 
 ---
@@ -166,7 +168,7 @@ npm start
 ## ディレクトリ構成
 
 ### 1. ルート構成
-```
+```bash
 smart-invoice/
 ├─ src/                     # フロントエンド（React + Vite）
 ├─ backend/                 # バックエンド（APIサーバ）
@@ -187,7 +189,7 @@ smart-invoice/
 ```
 
 ### 2. フロントエンド構成
-```
+```bash
 src/
 ├─ main.tsx                 # エントリポイント
 ├─ App.tsx                  # ルートコンポーネント
@@ -203,7 +205,7 @@ src/
 ```
 
 ### 3. バックエンド構成
-```
+```bash
 backend/
 ├─ package.json
 ├─ package-lock.json
@@ -228,7 +230,7 @@ backend/
 
 ## デプロイメント
 
-本番環境へのデプロイメント手順については、[DEPLOYMENT.md](./DEPLOYMENT.md) を参照してください。
+本番環境へのデプロイメント手順については、[DEPLOYMENT.md](./DEPLOYMENT.md) を参照してください。(初回のみ)
 
 ### 主な機能
 - **自動デプロイ**: `main`ブランチへのpushで自動デプロイ

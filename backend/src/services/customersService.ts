@@ -4,6 +4,7 @@ import { badRequest, conflict, notFound } from '../utils/httpError';
 export interface CustomerCreatePayload {
   company_code: string;
   company_name: string;
+  si_partner_name: string;
   unit_price: number;
   currency: string;
 }
@@ -11,11 +12,10 @@ export interface CustomerCreatePayload {
 export interface CustomerUpdatePayload {
   company_code?: string;
   company_name?: string;
+  si_partner_name?: string;
   unit_price?: number;
   currency?: string;
 }
-
-const DEFAULT_SI_PARTNER_NAME = 'BIPROGY株式会社';
 
 export async function listCustomers() {
   const repo = customerInfoRepository();
@@ -35,12 +35,17 @@ export async function getCustomerById(id: number) {
 
 export async function createCustomer(payload: Partial<CustomerCreatePayload>) {
   const repo = customerInfoRepository();
-  const { company_code, company_name, unit_price, currency } = payload;
+  const { company_code, company_name, si_partner_name, unit_price, currency } =
+    payload;
+
+  const normalizedSiPartnerName =
+    typeof si_partner_name === 'string' ? si_partner_name.trim() : '';
 
   // バリデーション（既存仕様を踏襲）
   if (
     !company_code ||
     !company_name ||
+    !normalizedSiPartnerName ||
     unit_price === undefined ||
     unit_price === null ||
     !currency
@@ -49,7 +54,7 @@ export async function createCustomer(payload: Partial<CustomerCreatePayload>) {
   }
 
   const parsedUnitPrice = Number(unit_price);
-  if (Number.isNaN(parsedUnitPrice) || parsedUnitPrice < 0) {
+  if (Number.isNaN(parsedUnitPrice) || !(parsedUnitPrice > 0)) {
     throw badRequest('Invalid unit price');
   }
 
@@ -59,7 +64,7 @@ export async function createCustomer(payload: Partial<CustomerCreatePayload>) {
   const entity = repo.create({
     company_code,
     company_name,
-    si_partner_name: DEFAULT_SI_PARTNER_NAME,
+    si_partner_name: normalizedSiPartnerName,
     unit_price: parsedUnitPrice,
     currency,
   });
@@ -75,7 +80,8 @@ export async function updateCustomer(
   const customer = await repo.findOne({ where: { id } });
   if (!customer) throw notFound('Customer not found');
 
-  const { company_code, company_name, unit_price, currency } = payload;
+  const { company_code, company_name, si_partner_name, unit_price, currency } =
+    payload;
 
   // 顧客コード重複チェック（自分以外）
   if (company_code && company_code !== customer.company_code) {
@@ -85,11 +91,18 @@ export async function updateCustomer(
 
   if (company_code !== undefined) customer.company_code = company_code;
   if (company_name !== undefined) customer.company_name = company_name;
-  customer.si_partner_name = DEFAULT_SI_PARTNER_NAME;
+  if (si_partner_name !== undefined) {
+    const normalized =
+      typeof si_partner_name === 'string' ? si_partner_name.trim() : '';
+    if (!normalized) {
+      throw badRequest('Invalid SI partner name');
+    }
+    customer.si_partner_name = normalized;
+  }
 
   if (unit_price !== undefined) {
     const parsedUnitPrice = Number(unit_price);
-    if (Number.isNaN(parsedUnitPrice) || parsedUnitPrice < 0) {
+    if (Number.isNaN(parsedUnitPrice) || !(parsedUnitPrice > 0)) {
       throw badRequest('Invalid unit price');
     }
     customer.unit_price = parsedUnitPrice;
