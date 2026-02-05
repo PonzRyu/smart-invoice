@@ -345,6 +345,16 @@ export const CreateInvoicePage = () => {
     setIsSubmitting(false);
   };
 
+  const openErrorModal = (messages: string | string[]) => {
+    setModalMode('error');
+    setModalMessages(Array.isArray(messages) ? messages : [messages]);
+    setUploadProgress(0);
+    setUploadProgressLabel('');
+    setUploadResult(null);
+    setIsSubmitting(false);
+    setIsConfirmModalOpen(true);
+  };
+
   const resetForm = () => {
     setSelectedCustomerId('');
     setYear('');
@@ -370,7 +380,7 @@ export const CreateInvoicePage = () => {
       if (file.name.endsWith('.csv')) {
         setUploadedFile(file);
       } else {
-        alert('.csvファイルのみアップロード可能です。');
+        openErrorModal('.csvファイルのみアップロード可能です。');
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
@@ -399,7 +409,7 @@ export const CreateInvoicePage = () => {
       if (file.name.endsWith('.csv')) {
         setUploadedFile(file);
       } else {
-        alert('.csvファイルのみアップロード可能です。');
+        openErrorModal('.csvファイルのみアップロード可能です。');
       }
     }
     // ファイルがドロップされていない場合は何もしない

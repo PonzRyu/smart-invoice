@@ -1508,8 +1508,8 @@
 
 .customer-list-header {
   display: grid;
-  grid-template-columns: 1.8fr 1.4fr 1fr 1.1fr 1.2fr 0.6fr;
-  gap: 12px;
+  grid-template-columns: 1.6fr 1.1fr 1.4fr 0.8fr 1fr 1.1fr 0.6fr;
+  gap: 10px;
   background: var(--white, #ffffff);
   padding: 16px 24px;
   font-weight: 600;
@@ -1519,8 +1519,8 @@
 
 .customer-list-row {
   display: grid;
-  grid-template-columns: 1.8fr 1.4fr 1fr 1.1fr 1.2fr 0.6fr;
-  gap: 12px;
+  grid-template-columns: 1.6fr 1.1fr 1.4fr 0.8fr 1fr 1.1fr 0.6fr;
+  gap: 10px;
   padding: 16px 24px;
   border-bottom: 1px solid #f0f0f0;
   transition: background-color 0.2s ease;
@@ -1568,6 +1568,11 @@
 .cell-code {
   font-family: 'Courier New', monospace;
   font-size: 13px;
+  color: #000000;
+}
+
+.cell-si-partner {
+  font-weight: 500;
   color: #000000;
 }
 
@@ -1913,6 +1918,7 @@
 .date-input-wrapper .form-input[type='date'] {
   padding-right: 40px;
   -webkit-appearance: none;
+  appearance: none;
 }
 
 .date-input-wrapper
