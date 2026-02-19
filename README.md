@@ -96,7 +96,7 @@ cd backend
 npm run start // backend 起動
 ```
 
-### 11. Electron デスクトップアプリ（任意）
+### 11. Electron デスクトップアプリ
 
 Web と同一のコードベースでデスクトップアプリとしても利用できます。
 
