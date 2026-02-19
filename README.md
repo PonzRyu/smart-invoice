@@ -96,6 +96,31 @@ cd backend
 npm run start // backend 起動
 ```
 
+### 11. Electron デスクトップアプリ
+
+Web と同一のコードベースでデスクトップアプリとしても利用できます。
+
+**開発モード**（Vite  dev server + Electron）:
+
+```bash
+npm run electron:dev
+```
+
+**本番ビルド・配布用パッケージ作成**:
+
+```bash
+# Windows 用インストーラー（NSIS）
+npm run electron:build:win
+
+# macOS 用（DMG）
+npm run electron:build:mac
+
+# 全プラットフォーム
+npm run electron:build
+```
+
+ビルド成果物は `release/` フォルダに出力されます。デスクトップアプリ利用時は、バックエンド API（`npm run start` を `backend/` で実行）が別途必要です。API URL は `.env.electron` で設定できます。
+
 ---
 ## システム構成
 
@@ -171,6 +196,9 @@ npm run start // backend 起動
 ```bash
 smart-invoice/
 ├─ src/                     # フロントエンド（React + Vite）
+├─ electron/                # Electron メインプロセス・プリロード
+│  ├─ main.ts               # メインプロセス
+│  └─ preload.ts            # プリロードスクリプト
 ├─ backend/                 # バックエンド（APIサーバ）
 ├─ public/                  # 静的ファイル
 ├─ tests/                   # テスト用データ（CSV など）
@@ -235,6 +263,7 @@ backend/
 ### 主な機能
 - **自動デプロイ**: `main`ブランチへのpushで自動デプロイ
 - **PWA対応**: プログレッシブウェブアプリとして動作
+- **Electron対応**: Web と同一コードベースでデスクトップアプリとしても配布可能
 - **HTTPS対応**: セキュアな通信を保証
 - **自動起動**: Windows起動時に自動的にアプリケーションが起動
 
