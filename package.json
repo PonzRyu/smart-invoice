@@ -64,7 +64,7 @@
       "target": [
         "nsis"
       ],
-      "icon": "public/icon.png",
+      "icon": "public/icon.ico",
       "signAndEditExecutable": true
     },
     "mac": {
