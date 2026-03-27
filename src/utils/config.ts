@@ -6,8 +6,10 @@
  * 具体的な API パス定義は src/services/apiRoutes.ts に集約します。
  */
 
-// Viteでは環境変数にVITE_プレフィックスが必要
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL =
+  typeof process !== 'undefined'
+    ? process.env.NEXT_PUBLIC_API_BASE_URL
+    : undefined;
 
 // 相対パスでも動作するようにする（本番環境で同じドメインで提供する場合）
 export const getApiUrl = (path: string): string => {

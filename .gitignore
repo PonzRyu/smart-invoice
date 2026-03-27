@@ -12,6 +12,7 @@ dist
 dist-electron
 dist-ssr
 release
+.next
 *.local
 
 # Editor directories and files

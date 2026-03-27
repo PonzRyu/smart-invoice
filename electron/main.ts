@@ -1,7 +1,7 @@
 /**
  * Electron メインプロセス
- * - 開発時: Vite  dev server (http://localhost:3000) をロード
- * - 本番時: ビルド済み dist/index.html をロード
+ * - 開発時: Next dev server (http://localhost:3000) をロード
+ * - 本番時: Next server (http://localhost:3000) をロード
  */
 
 import { app, BrowserWindow, type BrowserWindowConstructorOptions } from 'electron';
@@ -28,11 +28,14 @@ function createWindow(): void {
 
   const win = new BrowserWindow(options);
 
+  // NOTE:
+  // Next.js はファイルロードよりHTTPサーバー提供が基本なので、
+  // 本番でも `next start` (または同等) によりURLをロードします。
   if (isDev) {
     win.loadURL('http://localhost:3000');
     win.webContents.openDevTools();
   } else {
-    win.loadFile(path.join(__dirname, '../dist/index.html'));
+    win.loadURL('http://localhost:3000');
   }
 
   win.once('ready-to-show', () => {

@@ -22,11 +22,18 @@ async function handleResponse<T>(response: Response): Promise<T> {
       // JSONでない場合はそのまま進める
       data = null;
     }
+  } else {
+    try {
+      data = await response.text();
+    } catch {
+      data = null;
+    }
   }
 
   if (!response.ok) {
     const payload = data as ApiErrorPayload | null;
-    let message = 'サーバーとの通信に失敗しました。時間をおいて再度お試しください。';
+    let message =
+      'サーバーとの通信に失敗しました。時間をおいて再度お試しください。';
 
     if (payload) {
       if (Array.isArray(payload.error)) {
@@ -36,6 +43,8 @@ async function handleResponse<T>(response: Response): Promise<T> {
       } else if (typeof payload.message === 'string') {
         message = payload.message;
       }
+    } else if (typeof data === 'string' && data.trim() !== '') {
+      message = data;
     }
 
     throw new Error(message);
@@ -45,10 +54,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return data as T;
 }
 
-export async function getJson<T>(
-  url: string,
-  init?: RequestInit
-): Promise<T> {
+export async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
     method: 'GET',
@@ -100,4 +106,3 @@ export async function deleteRequest(
   });
   await handleResponse<unknown>(response);
 }
-

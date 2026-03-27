@@ -59,7 +59,9 @@ export async function fetchIssuedInvoices(
   return data.map((invoice) => ({
     ...invoice,
     ttm:
-      invoice.ttm !== null && invoice.ttm !== undefined ? Number(invoice.ttm) : null,
+      invoice.ttm !== null && invoice.ttm !== undefined
+        ? Number(invoice.ttm)
+        : null,
   }));
 }
 
@@ -88,4 +90,3 @@ export async function uploadInvoiceSummaries(
     payload
   );
 }
-

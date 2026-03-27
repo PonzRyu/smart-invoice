@@ -90,4 +90,3 @@ export async function updateCustomer(
 export async function deleteCustomer(id: number): Promise<void> {
   await deleteRequest(API_ROUTES.customer(id));
 }
-

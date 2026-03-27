@@ -25,4 +25,3 @@ export const API_ROUTES = {
       : baseUrl;
   },
 } as const;
-

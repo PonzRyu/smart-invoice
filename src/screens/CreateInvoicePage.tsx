@@ -1,5 +1,7 @@
+'use client';
+
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import Papa from 'papaparse/papaparse.js';
 import { TopBar } from '../parts/TopBar';
 import { NavigationRail } from '../parts/NavigationRail';
@@ -232,7 +234,7 @@ interface Customer {
  * 請求書作成に必要な情報を入力するフォーム
  */
 export const CreateInvoicePage = () => {
-  const navigate = useNavigate();
+  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 顧客情報
@@ -445,7 +447,9 @@ export const CreateInvoicePage = () => {
 
     const targetCompanyCode = selectedCustomer.company_code;
     resetForm();
-    navigate('/IssueInvoice', { state: { companyCode: targetCompanyCode } });
+    router.push(
+      `/IssueInvoice?companyCode=${encodeURIComponent(targetCompanyCode)}`
+    );
   };
 
   // 確認モーダル: 続行

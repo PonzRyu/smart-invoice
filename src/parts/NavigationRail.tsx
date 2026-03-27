@@ -1,4 +1,6 @@
-import { useNavigate, useLocation } from 'react-router-dom';
+'use client';
+
+import { usePathname, useRouter } from 'next/navigation';
 import homeIcon from '../styles/raws/home_raw.svg';
 import createInvoiceIcon from '../styles/raws/create_invoice_raw.svg';
 import issueInvoiceIcon from '../styles/raws/issue_an_invoice_raw.svg';
@@ -11,8 +13,8 @@ import releaseNoteIcon from '../styles/raws/release_note_raw.svg';
  * 左側のサイドバーナビゲーションを表示
  */
 export const NavigationRail = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const navItems = [
     {
@@ -43,7 +45,7 @@ export const NavigationRail = () => {
   ];
 
   const handleHomeClick = () => {
-    navigate('/');
+    router.push('/');
   };
 
   const handleNavItemClick = (path: string) => {
@@ -61,20 +63,20 @@ export const NavigationRail = () => {
           '_blank'
         );
       } else {
-        navigate(path);
+        router.push(path);
       }
     }
   };
 
   const isActive = (path: string) => {
-    return location.pathname === path;
+    return pathname === path;
   };
 
   return (
     <div className="navigation-rail">
       <div className="menu-fab">
         <div
-          className={`fab-icon-container ${location.pathname !== '/' ? 'transparent' : ''}`}
+          className={`fab-icon-container ${pathname !== '/' ? 'transparent' : ''}`}
           onClick={handleHomeClick}
         >
           <div className="fab-layer">

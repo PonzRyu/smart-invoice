@@ -1,5 +1,7 @@
+'use client';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useSearchParams } from 'next/navigation';
 import { TopBar } from '../parts/TopBar';
 import { NavigationRail } from '../parts/NavigationRail';
 import { BottomBar } from '../parts/BottomBar';
@@ -10,7 +12,7 @@ import downloadIcon from '../styles/raws/download_raw.svg';
 import questionIcon from '../styles/raws/question_raw.svg';
 import calendarIcon from '../styles/raws/calender_raw.svg';
 import { generateInvoiceExcel } from '../utils/excelGenerator';
-import templateUrl from '../assets/invoice_template.xlsx?url';
+const templateUrl = '/invoice_template.xlsx';
 import '../styles/styles.css';
 import {
   fetchCustomers as fetchCustomerList,
@@ -23,10 +25,8 @@ import {
 } from '../services/invoiceService';
 
 export const IssueInvoicePage = () => {
-  const location = useLocation();
-  const preselectedCompanyCode = (
-    location.state as { companyCode?: string } | null
-  )?.companyCode;
+  const searchParams = useSearchParams();
+  const preselectedCompanyCode = searchParams?.get('companyCode') ?? undefined;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCompanyCode, setSelectedCompanyCode] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
@@ -72,24 +72,27 @@ export const IssueInvoicePage = () => {
     loadCustomers();
   }, [fetchCustomerList]);
 
-  const fetchIssuedInvoicesAndSet = useCallback(async (companyCode: string) => {
-    setIsLoadingInvoices(true);
-    setErrorMessage('');
-    try {
-      const data = await fetchIssuedInvoices(companyCode);
-      setIssuedInvoices(data);
-    } catch (error) {
-      console.error(error);
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : '請求書情報の取得に失敗しました。'
-      );
-      setIssuedInvoices([]);
-    } finally {
-      setIsLoadingInvoices(false);
-    }
-  }, [fetchIssuedInvoices]);
+  const fetchIssuedInvoicesAndSet = useCallback(
+    async (companyCode: string) => {
+      setIsLoadingInvoices(true);
+      setErrorMessage('');
+      try {
+        const data = await fetchIssuedInvoices(companyCode);
+        setIssuedInvoices(data);
+      } catch (error) {
+        console.error(error);
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : '請求書情報の取得に失敗しました。'
+        );
+        setIssuedInvoices([]);
+      } finally {
+        setIsLoadingInvoices(false);
+      }
+    },
+    [fetchIssuedInvoices]
+  );
 
   const handleCustomerChange = (
     event: React.ChangeEvent<HTMLSelectElement>
@@ -233,20 +236,27 @@ export const IssueInvoicePage = () => {
 
       // Excelファイルを生成してダウンロード（ペナルティ請求ON時は110%超店舗で単価×商品更新数）
       const penaltyBilling = excessBillingMap[pendingInvoice.id] ?? false;
+
+      if (!selectedCustomer) {
+        throw new Error(
+          '顧客情報が見つかりません。再度顧客を選択してください。'
+        );
+      }
+
       await generateInvoiceExcel(
         templateUrl,
         {
           invoiceCode: pendingInvoice.invoice_code,
           issuedDate: pendingInvoice.issued_date,
           companyName: pendingInvoice.company_name,
-          siPartnerName: selectedCustomer?.si_partner_name ?? '',
+          siPartnerName: selectedCustomer.si_partner_name ?? '',
           ttm: pendingInvoice.ttm,
           billingDate: selectedBillingDate,
           paymentDeadline: selectedPaymentDeadline,
         },
         storeSummaries,
-        selectedCustomer?.unit_price!,
-        selectedCustomer?.currency!,
+        selectedCustomer.unit_price,
+        selectedCustomer.currency,
         penaltyBilling
       );
     } catch (error) {

@@ -1,4 +1,6 @@
-import { useNavigate } from 'react-router-dom';
+'use client';
+
+import { useRouter } from 'next/navigation';
 import { CardItem } from './CardItem';
 import createInvoiceIcon from '../styles/raws/create_invoice_raw.svg';
 import issueInvoiceIcon from '../styles/raws/issue_an_invoice_raw.svg';
@@ -11,7 +13,7 @@ import releaseNoteIcon from '../styles/raws/release_note_raw.svg';
  * ホームページのメイン機能カードを表示
  */
 export const CardGrid = () => {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const cards = [
     {
@@ -56,7 +58,7 @@ export const CardGrid = () => {
           '_blank'
         );
       } else {
-        navigate(path);
+        router.push(path);
       }
     }
   };

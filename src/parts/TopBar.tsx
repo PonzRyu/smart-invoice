@@ -1,4 +1,6 @@
-import { useNavigate, useLocation } from 'react-router-dom';
+'use client';
+
+import { usePathname, useRouter } from 'next/navigation';
 import arrowBackIcon from '../styles/raws/arrow_back_raw.svg';
 
 interface TopBarProps {
@@ -10,12 +12,12 @@ interface TopBarProps {
  * アプリケーションの上部ナビゲーションとタイトルを表示
  */
 export const TopBar = ({ headline = 'AIMS SaaS INVOICE' }: TopBarProps) => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const isHomePage = location.pathname === '/';
+  const router = useRouter();
+  const pathname = usePathname();
+  const isHomePage = pathname === '/';
 
   const handleBackClick = () => {
-    navigate('/');
+    router.push('/');
   };
 
   return (

@@ -1,3 +1,5 @@
+'use client';
+
 import { useCallback, useEffect, useState } from 'react';
 import { TopBar } from '../parts/TopBar';
 import { NavigationRail } from '../parts/NavigationRail';
@@ -146,7 +148,10 @@ export const CustomerManagementPage = () => {
     } catch (error) {
       console.error('Error deleting customer:', error);
       setDeleteTargetCustomer(null);
-      openNoticeModal('error', `既に請求データがある場合、顧客の削除はできません。`);
+      openNoticeModal(
+        'error',
+        `既に請求データがある場合、顧客の削除はできません。`
+      );
     } finally {
       setIsDeletingCustomer(false);
     }
@@ -178,10 +183,7 @@ export const CustomerManagementPage = () => {
 
   // 新規顧客の入力変更
   const handleNewCustomerChange = (
-    field: keyof Omit<
-      Customer,
-      'id' | 'created_at' | 'updated_at'
-    >,
+    field: keyof Omit<Customer, 'id' | 'created_at' | 'updated_at'>,
     value: string | number
   ) => {
     // unit_priceの場合は数値変換を確実に行う
